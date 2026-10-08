@@ -435,6 +435,25 @@ class Restaurar(Base):
         self.assertEqual(c, 2)
         self.assertIn("restaurar-entorno.sh --aplicar", t)
 
+    def test_avisa_que_el_script_actua_sobre_home_antes_de_confirmar(self):
+        # Hallazgo de la prueba real: con --destino en /tmp, el script igual modifico la configuracion personal.
+        self.hacer_remoto({"scripts/restaurar-entorno.sh": self.SCRIPT})
+        sis = Falso(self.t, respuestas=["n"])
+        c, t = self.correr(sis, argv=("acme/instancia", "--si"))
+        self.assertIn("actua sobre tu carpeta personal", t)
+        self.assertIn("responde N", t)
+        self.assertEqual(len([q for q in sis.preguntas if "restaurar-entorno" in q]), 1)   # se pregunta una vez, con el aviso ya impreso
+
+    def test_codigo_cero_del_script_no_se_presenta_como_nada_pendiente(self):
+        # Hallazgo de la prueba real: el script listo un pendiente propio y el resumen dijo "Nada pendiente".
+        self.hacer_remoto({"scripts/restaurar-entorno.sh": self.SCRIPT})
+        sis = Falso(self.t, respuestas=["s", "s"])
+        c, t = self.correr(sis, argv=("acme/instancia", "--si"))
+        resumen = t[t.index("RESUMEN"):]
+        self.assertNotIn("Nada pendiente", resumen)
+        self.assertIn("resumen del propio script de la instancia", resumen)
+        self.assertIn("termino con codigo 0", resumen)
+
     def test_sin_entorno_ni_restaurador_termina_bien(self):
         self.hacer_remoto({"README.md": "x"})
         c, t = self.correr(Falso(self.t, respuestas=["s"]))

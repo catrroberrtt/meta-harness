@@ -523,6 +523,8 @@ class Orquestador:
             self.pend("revisar scripts/restaurar-entorno.sh", "bash %s" % script)
             return 2
         self.dec("  Ejecutarlo con --aplicar instala hooks, memoria, herramientas y repos; el propio script te pregunta lo que sale a la red.")
+        self.dec("  OJO: ese script actua sobre tu carpeta personal (HOME: configuracion del agente, hooks, herramientas, repos), no solo sobre")
+        self.dec("  la copia clonada en %s. Si solo estas probando, responde N." % self.destino)
         if not self.confirmar("  ¿Ejecutar %s?" % cmd):
             self.dec("  No se ejecuta.")
             self.pend("preparar el entorno de la instancia", cmd)
@@ -533,7 +535,9 @@ class Orquestador:
             self.pend("terminar el entorno de la instancia", cmd)
             return 4
         self.marcar("restaurar")
-        self.hecho.append("entorno restaurado (scripts/restaurar-entorno.sh --aplicar)")
+        self.hecho.append("script de entorno ejecutado (scripts/restaurar-entorno.sh --aplicar; termino con codigo 0)")
+        # El codigo 0 no significa "sin pendientes": el script de la instancia lista los suyos y este resumen no los ve.
+        self.pend("leer el resumen del propio script de la instancia (arriba): puede listar prerrequisitos o pasos que fallaron aunque su codigo de salida sea 0", None)
         return 0
 
     def base_repos(self, ent):

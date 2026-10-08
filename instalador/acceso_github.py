@@ -34,6 +34,10 @@ import sys
 
 SI = ("s", "si", "sí", "y", "yes")
 
+# Comando previo por gestor: en un sistema recien instalado (p. ej. Ubuntu en WSL) las listas de paquetes de apt estan vacias
+# y `apt install gh` responde "Unable to locate package". Se muestra y se confirma junto con el de instalacion.
+PREVIOS = {"apt": ["sudo", "apt", "update"]}
+
 # gestor -> (comando de instalacion oficial, necesita administrador)
 GESTORES = (
     ("apt", ["sudo", "apt", "install", "gh"], True),
@@ -171,7 +175,10 @@ class Flujo:
             self.log("gh", "sin gestor: instrucciones a mano")
             return 2
         nombre, cmd, admin = g
-        self.dec("  gh no esta instalado. Gestor detectado: %s. Comando completo:" % nombre)
+        previo = PREVIOS.get(nombre)
+        self.dec("  gh no esta instalado. Gestor detectado: %s. Comando%s completo%s:" % (nombre, "s" if previo else "", "s" if previo else ""))
+        if previo:
+            self.dec("      " + " ".join(previo) + "   (actualiza las listas de paquetes; sin esto un sistema recien instalado no encuentra gh)")
         self.dec("      " + " ".join(cmd))
         if not self.aplicar:
             return 0
@@ -185,6 +192,10 @@ class Flujo:
                 self.instrucciones_a_mano()
                 self.log("gh", "administrador no confirmado")
                 return 2
+        if previo:
+            codigo, _ = self.correr(previo, interactivo=True)
+            if codigo != 0:
+                self.dec("  No se pudieron actualizar las listas de paquetes (codigo %s); se intenta la instalacion igualmente." % codigo)
         codigo, _ = self.correr(cmd, interactivo=True)
         if codigo != 0 or not self.s.existe("gh"):
             self.dec("  La instalacion no termino bien (codigo %s)." % codigo)

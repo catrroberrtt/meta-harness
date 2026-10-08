@@ -86,6 +86,25 @@ BASE = {("gh", "auth", "status"): (0, ""), **SSH_KEYGEN_L}
 
 
 class PasoGh(unittest.TestCase):
+    def test_apt_actualiza_las_listas_antes_de_instalar(self):
+        # Hallazgo de la primera prueba en una maquina real: Ubuntu recien instalado (WSL) no encuentra gh sin `apt update`.
+        d = Doble(comandos={"apt"}, respuestas=["s", "s"])
+        d.existe = lambda c: c == "apt" or (c == "gh" and ["sudo", "apt", "install", "gh"] in d.ejecutados)
+        _, salida, _, _ = correr(d)
+        self.assertIn("sudo apt update", salida)
+        self.assertLess(d.ejecutados.index(["sudo", "apt", "update"]), d.ejecutados.index(["sudo", "apt", "install", "gh"]))
+        self.assertEqual(sum("administrador" in p for p in d.preguntas), 1)   # una sola confirmacion para ambos
+
+    def test_el_plan_muestra_ambos_comandos_y_no_ejecuta(self):
+        d = Doble(comandos={"apt"})
+        _, salida, _, _ = correr(d, aplicar=False)
+        self.assertIn("sudo apt update", salida)
+        self.assertIn("sudo apt install gh", salida)
+        self.assertEqual(d.ejecutados, [])
+
+    def test_solo_apt_lleva_comando_previo(self):
+        self.assertEqual(set(ag.PREVIOS), {"apt"})
+
     def test_apt_muestra_comando_y_no_ejecuta_sin_confirmacion(self):
         d = Doble(comandos={"apt"}, respuestas=["n"])
         codigo, salida, _, _ = correr(d)

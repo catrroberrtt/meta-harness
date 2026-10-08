@@ -1,0 +1,12 @@
+# Acceso local de cada persona: nunca se versiona
+acceso.local.toml
+acceso.local.*.toml
+!acceso.local.ejemplo.toml
+
+# Secretos y residuos
+.env
+.env.*
+*.pem
+*.key
+__pycache__/
+*.pyc

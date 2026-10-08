@@ -1,0 +1,46 @@
+# Configuracion LOCAL de acceso, por persona. NO se versiona (va en el .gitignore de la instancia).
+# Copiala como acceso.local.toml y ajusta. Aqui solo van METODOS, hosts o alias, puertos y NOMBRES
+# de perfiles o variables. Nunca contrasenas, claves, tokens ni cadenas de conexion con usuario:
+# el preflight ignora y avisa (por nombre de campo) de cualquier campo con aspecto de secreto.
+
+[repositorios]
+metodo = "gh"                 # ssh | https | gh | sin_acceso
+# host = "git.ejemplo.org"    # solo para ssh
+
+[documentacion]
+metodo = "carpeta_repo"       # confluence | drive_md | carpeta_repo | sin_acceso
+carpeta = "~/proyectos/mi-proyecto/docs"   # para drive_md y carpeta_repo
+# host = "docs.ejemplo.org"   # para confluence
+# espacio = "CLAVE"           # confluence: espacio con la informacion de partida (partidas B y C)
+
+[tickets]
+metodo = "ninguno"            # jira | github_issues | ninguno | sin_acceso
+# host = "tickets.ejemplo.org"
+
+[nube]
+metodo = "perfil_sso"         # perfil_sso | rol_asumido | claves_entorno | sin_acceso
+perfil = "mi-perfil-lectura"  # solo el NOMBRE del perfil
+# variables = ["NOMBRE_VAR_1", "NOMBRE_VAR_2"]   # claves_entorno: solo NOMBRES, nunca valores
+
+[ci]
+metodo = "ninguno"            # github_actions | otro | ninguno | sin_acceso
+
+# Un bloque por ambiente declarado en la politica ([[datos.ambientes]] nombre = ...).
+[datos.local]
+metodo = "directo"            # directo | tunel_ssh | ssm | bastion | vpn | copia_local | sin_acceso
+host = "localhost"
+puerto = 5000
+
+[datos.pruebas]
+metodo = "tunel_ssh"          # el tunel lo abres tu; el preflight solo comprueba que escucha
+host = "127.0.0.1"
+puerto = 6001
+
+# [datos.copia]
+# metodo = "copia_local"
+# archivo = "~/copias/volcado.sql"
+
+# Solo partida C (migracion): el sistema origen o su descripcion en archivos.
+# [origen]
+# metodo = "descripcion"      # codigo | volcado | descripcion | sin_acceso
+# ruta = "~/entrada/origen"   # esquema, diccionario, hojas de calculo (xlsx/csv), .sql

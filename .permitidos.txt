@@ -1,0 +1,41 @@
+# Excepciones del escaneo de publicación. Formato: glob de ruta | clase | motivo (obligatorio).
+# Revisadas a mano el 2026-10-07: cada una es un dato de prueba evidente o un nombre de campo, nunca un valor real.
+# La clase `prohibido` (referencias a empresa o proyecto) no se puede exceptuar.
+
+# --- correos que no son personas ---
+acceso/GITHUB.md | persona | `git@github.com` es el usuario SSH público de GitHub, no una persona
+cli/README.md | persona | `git@github.com` es el usuario SSH público de GitHub, no una persona
+cli/harness_cli.py | persona | `git@github.com` es el usuario SSH público de GitHub (forma de URL de repositorio)
+cli/tests/test_cli.py | persona | `git@github.com` en URLs de repositorio de prueba
+instalador/acceso_github.py | persona | `git@github.com` es el usuario SSH público de GitHub (comando de verificación)
+instalador/tests/test_acceso_github.py | persona | `git@github.com` y direcciones de ejemplo en pruebas del acceso a GitHub
+instalador/tests/test_instalar_instancia.py | persona | direcciones `@ejemplo.org` de ejemplo en pruebas
+herramientas/tests/test_leer_entradas.py | persona | direcciones `@x.io` de ejemplo en una hoja de cálculo de prueba
+bootstrap/instalar.sh | persona | `python@3.12` es el nombre de una fórmula de Homebrew, no un correo
+
+# --- secretos falsos de prueba (existen para comprobar que el enmascarado y el descarte funcionan) ---
+cli/tests/test_cli.py | secreto | valores falsos (`ghp_SECRETO123` y similares) para probar que no se guardan en la sesión
+herramientas/tests/test_aportar.py | secreto | valor falso para probar que el aporte rechaza credenciales
+herramientas/tests/test_detectar.py | secreto | valores falsos para probar que el detector no los reproduce
+herramientas/tests/test_escaneo_publico.py | secreto | valor falso armado por partes para probar el propio escaneo
+instalador/tests/test_acceso_github.py | secreto | llave privada falsa con marcador `SECRETO_PRIVADO_XYZ_123` para probar que nunca se imprime
+instalador/tests/test_generar_politicas.py | secreto | nombre de variable de ejemplo, sin valor real
+instalador/tests/test_instalar_instancia.py | secreto | URLs con credencial falsa para probar que se descartan de toda salida
+instalador/tests/test_preflight.py | secreto | valores falsos para probar que el preflight no los imprime
+
+adaptadores-agente/tests/test_capacidades_comunes.py | secreto | referencia a una variable llamada TOKEN_DOCS y un valor falso inyectado para probar que el MCP rechaza secretos
+adaptadores-agente/nucleo/capacidades_comunes.py | secreto | línea de documentación que describe un bloque `{clave: valor}`, sin valor real
+
+# --- nombres de campo y de política, no valores ---
+instalador/generar-politicas.py | secreto | `"VAR_CONTRASENA": "NO_DECLARADA"` es un nombre de variable y un texto de marcador
+instalador/preflight-accesos.py | secreto | claves del informe (`campos_con_aspecto_de_secreto`), no valores
+politicas/politicas.defecto.toml | secreto | `imprimir_secretos = "prohibida"` es una regla de política, no un secreto
+
+adaptadores-agente/claude-code/adaptador.py | secreto | línea de documentación que describe un diccionario `{clave: valor}` de fusión, sin valor real
+adaptadores-agente/cursor/adaptador.py | secreto | línea de documentación que describe un diccionario `{clave: valor}` de fusión, sin valor real
+adaptadores-agente/opencode/adaptador.py | secreto | línea de documentación que describe un diccionario `{clave: valor}` de fusión, sin valor real
+adaptadores-agente/copilot/adaptador.py | secreto | tabla de rutas y nombres de clave de configuración de MCP (`servers`, `mcpServers`), sin valor real
+
+# --- este mismo archivo cita los textos que justifica ---
+.permitidos.txt | persona | cita `git@github.com` y `python@3.12` para explicar por qué no son personas
+.permitidos.txt | secreto | cita nombres de campo (`VAR_CONTRASENA`, `imprimir_secretos`) y valores falsos de prueba para justificarlos

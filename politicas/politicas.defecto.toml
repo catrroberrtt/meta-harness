@@ -1,0 +1,131 @@
+# Politica por defecto del harness: CONSERVADORA y sin datos de ningun proyecto.
+#
+# Principios:
+#   - Nada se asume: no hay ambientes, hosts, puertos, bases, cuentas ni ramas declaradas.
+#     Un proyecto los detecta (adopt) o los declara; hasta entonces el generador se niega a
+#     producir el hook de datos (ver ESQUEMA.md, "Que pasa si falta algo").
+#   - Ante la duda: "confirmar". Lo irreversible o lo que cobra: "prohibida" para el agente.
+#   - Un proyecto copia este archivo, declara lo suyo y cambia lo que su equipo decida.
+#
+# Valores de permiso: "permitida" | "confirmar" | "prohibida".
+
+[proyecto]
+nombre = ""                    # libre
+etiqueta_reglas = "politica de datos"   # prefijo de los mensajes de los hooks generados
+
+# --- Alcance de los hooks de repositorio ---------------------------------------------------
+[alcance]
+repos = []                     # patrones de nombre de repo (fnmatch) a vigilar; vacio = nada vigilado
+remote_regex = ""              # regex del remote que identifica al grupo; vacio = no se exige remote
+sin_remote_ok = []             # patrones de repos locales que pueden no tener remote
+cualquier_remote = []          # patrones de repos vigilados con cualquier remote
+remote_ejemplo = ""            # URL que debe satisfacer remote_regex (solo autoprueba)
+
+# --- datos ----------------------------------------------------------------------------------
+[datos]
+hosts_locales = []             # hosts que cuentan como "base local"; todo otro host es remoto
+clientes_sql = ["mysql", "psql", "mysqlsh", "mariadb"]
+lectura_host_no_resuelto = "confirmar"   # host que viene de una variable o sin -h
+lectura_host_remoto = "prohibida"
+escritura_fuera_de_ambiente_de_escritura = "prohibida"
+
+# [datos.motores_solo_lectura]
+# scripts = []                 # rutas relativas de scripts de solo lectura con sha256 fijado
+# archivo_sha256 = ""          # archivo donde el usuario fija los hashes (ruta absoluta o ~/...)
+
+# Ambientes: SIN DEFECTO. Se declaran con [[datos.ambientes]] (ver ESQUEMA.md). Ejemplo vacio:
+#
+# [[datos.ambientes]]
+# nombre = ""
+# tipo = "local"                       # local | pruebas | produccion
+# [datos.ambientes.reconocimiento]
+# hosts = []  puertos = []  bases = []  bases_prefijos = []
+# [datos.ambientes.variables]          # solo si el agente puede escribir aqui
+# archivo_env = ""  host = ""  puerto = ""  base = ""  contrasena = ""
+# [datos.ambientes.permisos]
+# lectura = "confirmar"  escritura = "prohibida"  ddl = "prohibida"  migraciones = "prohibida"
+
+# Comandos de datos prohibidos por defecto (stack Node/TypeORM; ajustar al stack del proyecto).
+[[datos.comandos]]
+nombre = "migraciones"
+regex = '(^|[;&|] *)npm run migrate(:revert)?( |$)'
+permitida_en_ambiente_de_escritura = true
+motivo = "ejecuta un script de migracion contra una base que no es el ambiente de pruebas del agente"
+
+[[datos.comandos]]
+nombre = "semillas"
+regex = '(^|[;&|] *)npm run seed( |$)'
+permitida_en_ambiente_de_escritura = false
+motivo = "ejecuta un script de semillas contra la base"
+
+[[datos.comandos]]
+nombre = "CLI del ORM"
+regex = '\btypeorm(-extension)?\b.*\b(migration|schema):|npx typeorm\b'
+permitida_en_ambiente_de_escritura = false
+motivo = "invoca el CLI del ORM directamente"
+
+# --- git ------------------------------------------------------------------------------------
+[git]
+ramas_protegidas = []          # SIN DEFECTO: se detectan del remoto o se preguntan
+aprueba = ""                   # quien aprueba un merge/despliegue a una rama protegida: se pregunta
+confirmar = ["commit", "push"] # acciones que piden confirmacion explicita del usuario
+push_a_rama_protegida = "prohibida"
+merge_a_rama_de_produccion = "prohibida"
+
+# --- comandos -------------------------------------------------------------------------------
+[comandos.instalar]            # instalar dependencias o herramientas globales
+accion = "prohibida"
+regex = '\bnpm[[:space:]]+(install|ci)\b|\bnpm[[:space:]]+i([[:space:]]|$)'
+repos = []
+repos_exentos = []
+
+[comandos.build]
+accion = "confirmar"           # compilar/empaquetar; el proyecto lo sube a "permitida" si quiere
+[comandos.test]
+accion = "confirmar"
+[comandos.servidor_de_desarrollo]
+accion = "prohibida"           # procesos que se quedan corriendo
+[comandos.formateo_global]
+accion = "prohibida"           # reescribe archivos ajenos
+
+# --- despliegue -----------------------------------------------------------------------------
+[despliegue]
+accion = "confirmar"           # confirmacion explicita y puntual antes de cualquier despliegue real
+repos = []
+regex = []                     # comandos de despliegue a vigilar (cdk deploy, update-function-code...)
+produccion = "prohibida"       # el agente nunca despliega a produccion
+
+# --- costos ---------------------------------------------------------------------------------
+[costos]
+anunciar_antes = true          # llamadas, ambiente/cuenta, costo por llamada y tope, ANTES de ejecutar
+operaciones_que_cobran = []    # SIN DEFECTO: servicios de pago del proyecto (se preguntan)
+cuentas_de_produccion = []     # SIN DEFECTO: ids de cuenta/proyecto de produccion
+produccion_escritura_invocacion_envio = "prohibida"
+lecturas_de_nube = "permitida" # list/describe/get/head y descargas
+bucles_o_paralelismo_sobre_pago = "prohibida"
+tope_de_llamadas_por_pasada = 0    # 0 = sin tope declarado => el agente pregunta antes
+
+# --- secretos -------------------------------------------------------------------------------
+[secretos]
+rutas_prohibidas_en_commit = [".env", ".env.*", "*.pem", "*.key", "id_rsa*", "credentials*"]
+patrones_prohibidos = ["AKIA[0-9A-Z]{16}", "-----BEGIN [A-Z ]*PRIVATE KEY-----"]
+imprimir_secretos = "prohibida"
+pii_en_documentacion = "prohibida"
+excepciones = []               # rutas versionadas a proposito aunque parezcan secretas
+
+# --- verificacion ---------------------------------------------------------------------------
+[verificacion]
+evidencia_de_datos = "obligatoria"    # no hay veredicto sobre cifras sin una consulta real mostrada
+visual = "obligatoria"                # pantallas: abrirlas y capturar antes de reportar listo
+estructura_de_modulos = "obligatoria" # medir con el motor de auditoria antes de cerrar un modulo
+reporte_sin_prueba = "prohibida"      # "listo/correcto/verificado" sin resultado observable
+
+# --- mcp (opcional) -------------------------------------------------------------------------
+# SIN DEFECTO: sin [[mcp.servidores]] no se genera nada. `entorno` solo admite referencias ${VARIABLE}, nunca valores.
+#
+# [[mcp.servidores]]
+# nombre = ""                          # ^[a-z0-9]+(-[a-z0-9]+)*$
+# comando = ""                         # o `url = "https://..."` (exactamente uno de los dos)
+# args = []
+# entorno = {}                         # CLAVE = "${VARIABLE}"
+# registrar = "confirmar"              # prohibida | confirmar | permitida

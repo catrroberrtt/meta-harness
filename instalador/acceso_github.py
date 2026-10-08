@@ -212,6 +212,8 @@ class Flujo:
             self.dec("  Ya hay una sesion iniciada.")
             return 0
         self.dec("  No hay sesion. En otra terminal ejecuta:  gh auth login")
+        self.dec("  IMPORTANTE: en la MISMA maquina y el MISMO sistema donde corre este programa (si usas WSL, dentro de Ubuntu;")
+        self.dec("  una sesion iniciada en PowerShell de Windows NO vale: gh guarda la sesion por sistema).")
         self.dec("  (inicias sesion tu en el navegador; este programa no ve ni guarda tu contrasena ni tu token).")
         self.s.preguntar("  Pulsa Enter cuando hayas terminado:", "")
         codigo, _ = self.correr(["gh", "auth", "status"])

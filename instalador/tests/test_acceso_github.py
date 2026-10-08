@@ -86,6 +86,13 @@ BASE = {("gh", "auth", "status"): (0, ""), **SSH_KEYGEN_L}
 
 
 class PasoGh(unittest.TestCase):
+    def test_sin_sesion_avisa_que_debe_ser_el_mismo_sistema(self):
+        # Hallazgo de la prueba real: se inicio sesion en PowerShell (Windows) y no en Ubuntu (WSL); las sesiones no se comparten.
+        d = Doble(comandos={"gh"}, respuestas=[""], respuestas_cmd={("gh", "auth", "status"): (1, "not logged in")})
+        _, salida, _, _ = correr(d)
+        self.assertIn("MISMO sistema", salida)
+        self.assertIn("WSL", salida)
+
     def test_apt_actualiza_las_listas_antes_de_instalar(self):
         # Hallazgo de la primera prueba en una maquina real: Ubuntu recien instalado (WSL) no encuentra gh sin `apt update`.
         d = Doble(comandos={"apt"}, respuestas=["s", "s"])

@@ -52,6 +52,15 @@ Reglas que el generador hace cumplir: a lo sumo **un** ambiente con `escritura =
 
 Granularidad del hook generado: la **lectura** se decide por host (`hosts_locales`); la **escritura** exige host + puerto + base del ambiente de escritura. Si un proyecto quiere que leer otro ambiente local (por puerto) pida confirmación, es una decisión nueva que se declara y se pregunta.
 
+### Rol de solo lectura (declaración opcional, solo informativa)
+
+| Clave | Tipo | Qué significa |
+|---|---|---|
+| `datos.rol_solo_lectura` | texto | nombre del rol de solo lectura que la persona creó en el servidor de datos para el agente |
+| `datos.ambientes[].rol_lectura` | texto | lo mismo, por ambiente |
+
+Son **declaraciones**: el harness no crea el rol ni comprueba que exista (eso exige acceso al servidor). El montaje las usa solo para decidir si lista como pendiente «crear el rol de solo lectura», que es la garantía real porque no depende del agente. Si no se declaran, queda como paso de la persona. La base de datos no se instala con el harness; el acceso lo da la persona (ver `acceso.local.toml`).
+
 ### `[[datos.comandos]]` (comandos que tocan la base)
 
 | Clave | Qué dice |

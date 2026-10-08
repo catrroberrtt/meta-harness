@@ -1,8 +1,10 @@
 import importlib.util
 import json
 import os
+import re
 import tempfile
 import unittest
+from unittest import mock
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location("acceso_github", os.path.join(AQUI, "..", "acceso_github.py"))
@@ -367,6 +369,90 @@ class Garantias(unittest.TestCase):
         d = Doble(comandos={"gh"}, archivos={"/casa/.ssh/id_ed25519.pub": PUB}, respuestas=["ssh", "n"], respuestas_cmd=r)
         correr(d)
         self.assertFalse(any(c[:3] == ["git", "config", "--global"] and len(c) == 5 for c in d.ejecutados))
+
+
+class LoginInline(unittest.TestCase):
+    AYUDA = "Flags:\n  -h, --hostname string\n  --git-protocol string\n  -w, --web\n  --skip-ssh-key\n  -s, --scopes\n"
+
+    def doble(self, ayuda, respuestas, wsl=False, programas=(), status=(1, 0)):
+        estado = {"n": 0}
+
+        def st(a):
+            r = status[min(estado["n"], len(status) - 1)]
+            estado["n"] += 1
+            return (r, "")
+        d = Doble(comandos={"gh"} | set(programas), respuestas=respuestas,
+                  respuestas_cmd={**BASE, ("gh", "auth", "status"): st, ("gh", "auth", "login", "--help"): ayuda})
+        d.es_wsl = lambda: wsl
+        d.existe_cualquiera = lambda c: c in programas
+        d.entornos = []
+        original = d.ejecutar
+
+        def ejecutar(args, entrada=None, interactivo=False, entorno=None):
+            d.entornos.append((list(args), interactivo, entorno))
+            return original(args, entrada, interactivo, entorno)
+        d.ejecutar = ejecutar
+        return d
+
+    def login(self, d):
+        return [e for e in d.entornos if e[0][:3] == ["gh", "auth", "login"] and "--help" not in e[0]]
+
+    def test_ejecuta_login_en_la_misma_terminal_con_el_comando_exacto(self):
+        d = self.doble((0, self.AYUDA), ["s", "ssh"])
+        correr(d)
+        (args, interactivo, _), = self.login(d)
+        self.assertEqual(args, ["gh", "auth", "login", "--hostname", "github.com", "--git-protocol", "ssh", "--web", "--skip-ssh-key"])
+        self.assertTrue(interactivo)
+
+    def test_banderas_degradadas_si_la_ayuda_no_las_lista(self):
+        d = self.doble((0, "Flags:\n  --web\n"), ["s", "ssh"])
+        _, salida, _, _ = correr(d)
+        (args, _, _), = self.login(d)
+        self.assertEqual(args, ["gh", "auth", "login", "--web"])
+        self.assertIn("--hostname", salida)
+        d = self.doble((1, "error"), ["s", "ssh"])
+        correr(d)
+        self.assertEqual(self.login(d)[0][0], ["gh", "auth", "login"])
+
+    def test_sin_confirmacion_no_se_ejecuta_login(self):
+        d = self.doble((0, self.AYUDA), ["n"], status=(1,))
+        codigo, salida, _, _ = correr(d)
+        self.assertEqual(self.login(d), [])
+        self.assertEqual(codigo, 2)
+        self.assertIn("MISMO sistema", salida)
+
+    def test_wsl_apunta_browser_a_wslview_o_explorer(self):
+        d = self.doble((0, self.AYUDA), ["s", "ssh"], wsl=True, programas=("wslview", "explorer.exe"))
+        correr(d)
+        self.assertEqual(self.login(d)[0][2], {"BROWSER": "wslview"})
+        d = self.doble((0, self.AYUDA), ["s", "ssh"], wsl=True, programas=("explorer.exe",))
+        correr(d)
+        self.assertEqual(self.login(d)[0][2], {"BROWSER": "explorer.exe"})
+        d = self.doble((0, self.AYUDA), ["s", "ssh"], wsl=True)
+        correr(d)
+        self.assertFalse(self.login(d)[0][2])
+        d = self.doble((0, self.AYUDA), ["s", "ssh"], wsl=False, programas=("wslview",))
+        correr(d)
+        self.assertFalse(self.login(d)[0][2])
+
+
+class BinariosDeWindows(unittest.TestCase):
+    def test_en_wsl_se_ignoran_los_programas_de_windows(self):
+        with tempfile.TemporaryDirectory() as t:
+            win, lin = os.path.join(t, "mnt", "c", "bin"), os.path.join(t, "usr")
+            for d in (win, lin):
+                os.makedirs(d)
+            for d, n in ((win, "npm"), (win, "gh"), (lin, "gh")):
+                with open(os.path.join(d, n), "w") as f:
+                    f.write("#!/bin/sh\n")
+                os.chmod(os.path.join(d, n), 0o755)
+            nativo = lambda c, w: ag.buscar_nativo(c, win + os.pathsep + lin, w)
+            with mock.patch.object(ag, "RUTA_WINDOWS", re.compile(r"^%s(/|$)" % re.escape(os.path.join(t, "mnt", "c")))):
+                self.assertEqual(nativo("npm", True), (None, os.path.join(win, "npm")))
+                self.assertEqual(nativo("npm", False), (os.path.join(win, "npm"), None))
+                self.assertEqual(nativo("gh", True)[0], os.path.join(lin, "gh"))
+        self.assertTrue(ag.RUTA_WINDOWS.match("/mnt/c/Program Files/nodejs"))
+        self.assertFalse(ag.RUTA_WINDOWS.match("/mnt/datos2"))
 
 
 class ModoPlan(unittest.TestCase):

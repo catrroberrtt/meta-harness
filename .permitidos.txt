@@ -26,6 +26,11 @@ instalador/tests/test_preflight.py | secreto | valores falsos para probar que el
 adaptadores-agente/tests/test_capacidades_comunes.py | secreto | referencia a una variable llamada TOKEN_DOCS y un valor falso inyectado para probar que el MCP rechaza secretos
 adaptadores-agente/nucleo/capacidades_comunes.py | secreto | línea de documentación que describe un bloque `{clave: valor}`, sin valor real
 
+instalador/orquestador.py | persona | `git@github.com` es el usuario SSH público de GitHub (URL de repositorio), no una persona
+instalador/tests/test_orquestador.py | persona | `git@github.com` en URLs de repositorio de prueba
+instalador/tests/test_orquestador.py | secreto | token falso `ghp_SECRETO...` para probar que nunca aparece en la salida ni en el estado
+bootstrap/tests/test_bootstrap.py | secreto | URL con credencial falsa para probar que se rechaza o se limpia
+
 # --- nombres de campo y de política, no valores ---
 instalador/generar-politicas.py | secreto | `"VAR_CONTRASENA": "NO_DECLARADA"` es un nombre de variable y un texto de marcador
 instalador/preflight-accesos.py | secreto | claves del informe (`campos_con_aspecto_de_secreto`), no valores

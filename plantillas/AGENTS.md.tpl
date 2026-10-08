@@ -15,6 +15,10 @@
 
 {{REGLAS}}
 
+## Acceso a datos (lo da la persona)
+
+{{DATOS}}
+
 ## Gate de calidad
 
 {{GATE}}

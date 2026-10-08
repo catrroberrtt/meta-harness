@@ -1,0 +1,50 @@
+# Contrato opcional de la instancia: .harness/entorno.toml (copialo sin la extension .ejemplo).
+# Lo lee `harness instalar owner/nombre` DESPUES de clonar la instancia. Documentado en docs/ENTORNO-INSTANCIA.md.
+# NO declares aqui pasos de bases de datos (ni clientes, contenedores, respaldos o tuneles): el acceso a datos lo declara y
+# lo da cada persona (politicas.toml + acceso.local.toml; se comprueba con instalador/preflight-accesos.py).
+# Validacion estricta: una clave desconocida o un tipo equivocado detiene el entorno ENTERO sin ejecutar nada.
+
+[general]
+# Carpeta base de los repositorios de abajo (absoluta o con ~). Por defecto: ~/Desktop/Proyectos
+base_repos = "~/Proyectos"
+
+# Programas que la instancia necesita. Se buscan como programas de Linux (en WSL se ignoran los de Windows).
+[[prerrequisitos]]
+comando = "node"                 # nombre del programa
+para = "compilar las herramientas"
+instalar_apt = "nodejs npm"      # opcional: paquetes apt (texto o lista); se instalan con UNA confirmacion de administrador
+obligatorio = true               # false: si falta, solo se avisa
+
+[[prerrequisitos]]
+comando = "shellcheck"
+para = "revisar los scripts"
+instalar_apt = "shellcheck"
+obligatorio = false
+
+# Repositorios hermanos. `destino` es relativo a base_repos y no puede salir de ella.
+[[repositorios]]
+remoto = "owner/api-ejemplo"     # owner/nombre (GitHub por SSH) o URL https/ssh sin credenciales
+destino = "tenant-a/api-ejemplo"
+confirmacion = true              # por defecto true: son privados y pesan; se preguntan todos juntos
+
+[[repositorios]]
+remoto = "owner/docs-ejemplo"
+destino = "tenant-a/docs-ejemplo"
+confirmacion = false
+
+# Pasos. `comando` es una LISTA (se ejecuta sin shell) y corre dentro de la instancia (cwd relativo a ella).
+# Un paso con red = true o pesado = true NUNCA corre sin tu confirmacion, ni siquiera con --si.
+[[pasos]]
+nombre = "indexar"
+comando = ["python3", "scripts/indexar.py"]
+red = false
+pesado = false
+por_defecto = "si"               # "si" | "no" | "preguntar"
+cwd = "."
+
+[[pasos]]
+nombre = "descargar-modelos"
+comando = ["python3", "scripts/descargar.py"]
+red = true
+pesado = true
+por_defecto = "preguntar"

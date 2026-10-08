@@ -13,7 +13,7 @@ instalador/acceso-github.sh --aplicar --repositorio <url> --salida <carpeta>
 
 ## Que hace
 1. **`gh`**: si falta, detecta el gestor de paquetes (apt, dnf, yum, pacman, zypper, brew, winget, choco), muestra el comando completo y lo ejecuta solo si confirmas; si necesita administrador lo dice y lo pide aparte. Sin gestor o si dices no, imprime como hacerlo a mano.
-2. **Sesion**: comprueba `gh auth status`. Sin sesion te indica `gh auth login` (lo haces tu) y espera.
+2. **Sesion**: comprueba `gh auth status`. Sin sesion, y con tu confirmacion, ejecuta `gh auth login --hostname github.com --git-protocol ssh --web --skip-ssh-key` **en esta misma terminal** (solo con las banderas que tu `gh` liste en `--help`; en WSL, `BROWSER` apunta a `wslview` o `explorer.exe` si existen). Tu apruebas el codigo y la URL en el navegador. Si dices que no, te indica hacerlo tu en el MISMO sistema (una sesion de PowerShell no vale en WSL).
 3. **Metodo**: SSH (por defecto) o HTTPS por `gh` (`gh auth setup-git`).
 4. **Llave SSH**: reutiliza una existente (ed25519, ecdsa o RSA de al menos 3072 bits). Si no hay, propone `ssh-keygen -t ed25519` en una ruta que no existe (nunca sobrescribe), deja que `ssh-keygen` te pida la frase de contrasena (recomendada), la añade al `ssh-agent` y registra **solo la publica** con `gh ssh-key add` y el titulo `<maquina> <fecha>`, mostrando titulo y huella antes. Si ya esta registrada, no la duplica.
 5. **Permisos y SSO**: si falta `admin:public_key`, propone `gh auth refresh -s admin:public_key`. Si la organizacion exige SSO, explica que la llave debe autorizarse (GitHub → Settings → SSH and GPG keys → Configure SSO) y se detiene.

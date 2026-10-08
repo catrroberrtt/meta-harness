@@ -25,7 +25,7 @@ import tomllib
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-SUBCOMANDOS = ("instalar", "update", "doctor", "estado")
+SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado")
 IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__", ".harness", "dist", "build", ".idea", ".vscode"}
 CODIGO_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs", ".kt", ".swift",
               ".c", ".cpp", ".h", ".scala", ".vue", ".sh", ".dart", ".lua"}
@@ -541,6 +541,19 @@ class Asistente:
                 self.sesion.paso("terminada")
             out.p("\nListo. Siguiente: `harness doctor` y `harness estado` en la instancia."
                   + (" Revisa .harness/informe-adopt.md con tu equipo y vuelve a correr `harness` para instalar el esqueleto." if modo == "adopt" else ""))
+            if modo != "adopt" and self.interactivo:
+                # Montaje del entorno de los agentes (AGENTS.md, skills, permisos, hooks de datos si la politica lo permite).
+                # Si la entrada se agota se toma como «no»: nunca monta sin una respuesta afirmativa.
+                try:
+                    quiere = self.confirmar("¿Monto ahora el entorno de tus agentes de IA (AGENTS.md, skills, permisos)? [s/N]\n"
+                                            "(Las bases de datos no se instalan: el acceso a datos lo das tú; el montaje te lo recordará.)")
+                except (EOFError, StopIteration):
+                    quiere = False
+                if quiere:
+                    rc = subprocess.run([sys.executable, str(self.raiz / "instalador" / "montaje.py"), str(instancia), "--aplicar"]).returncode
+                    self.informe["montaje"] = rc
+                else:
+                    out.p("No monté nada. Cuando quieras: `harness montar " + str(instancia) + "` (primero muestra el plan).")
         return r.returncode
 
 
@@ -816,6 +829,22 @@ def instalar_remoto(a, out, raiz):
     return codigo
 
 
+HOOKS_ORQ = {}
+"""Dobles para pruebas del flujo completo: claves opcionales `sistema`, `preguntar`, `acceso`, `hooks_clonar`, `doctor`
+(se pasan tal cual a instalador/orquestador.py)."""
+
+
+def instalar_completo(a, out, raiz):
+    """UN solo comando: paquetes, acceso a GitHub, clon, entorno de la instancia y doctor, con un plan y reanudable."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("orquestador_mh", Path(raiz) / "instalador" / "orquestador.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    argv = [a.instancia] + (["--destino", a.destino] if a.destino else []) + (["--si"] if a.si else []) \
+        + (["--plan"] if getattr(a, "plan", False) else [])
+    return mod.main(argv, salida=out.flujo, raiz=Path(raiz), **HOOKS_ORQ)
+
+
 def delegar_instalador(raiz, modo, instancia, extra, out):
     cmd = [sys.executable, Path(raiz) / "instalador" / "harness_instalar.py", modo, instancia, "--harness", raiz] + extra
     r = correr(cmd)
@@ -825,7 +854,9 @@ def delegar_instalador(raiz, modo, instancia, extra, out):
 
 def cmd_instalar(a, out, raiz):
     if es_repositorio(a.instancia):
-        return instalar_remoto(a, out, raiz)
+        if HOOKS_REMOTO or getattr(a, "solo_clonar", False):   # HOOKS_REMOTO: dobles del flujo corto (solo clonar)
+            return instalar_remoto(a, out, raiz)
+        return instalar_completo(a, out, raiz)
     instancia = resolver_instancia(a.instancia)
     modo = a.modo or ("update" if (instancia / "harness.lock").exists() else NOMBRE_MODO.get(a.partida or "B", "init"))
     extra = []
@@ -840,6 +871,18 @@ def cmd_instalar(a, out, raiz):
         if a.partida:
             extra = [x for x in extra if x != a.partida]
     return delegar_instalador(raiz, modo, instancia, extra, out)
+
+
+def cmd_montar(a, out, raiz):
+    """Monta el entorno de los agentes sobre una instancia ya creada. Hereda la terminal: el montaje hace sus propias preguntas."""
+    instancia = resolver_instancia(a.instancia or os.getcwd())
+    cmd = [sys.executable, str(Path(raiz) / "instalador" / "montaje.py"), str(instancia)]
+    if a.agentes:
+        cmd += ["--agentes", a.agentes]
+    for flag, val in (("--aplicar", a.aplicar), ("--si", a.si), ("--json", a.json)):
+        if val:
+            cmd.append(flag)
+    return subprocess.run(cmd).returncode
 
 
 def cmd_update(a, out, raiz):
@@ -916,7 +959,9 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
         if sub == "instalar":
             p.add_argument("instancia", help="carpeta local, o repositorio (https://, ssh://, git@host:ruta u owner/nombre)")
             p.add_argument("--destino", help="repositorio remoto: carpeta donde clonar (por defecto, ./<nombre>)")
-            p.add_argument("--si", action="store_true", help="repositorio remoto: acepta el plan sin preguntar")
+            p.add_argument("--si", action="store_true", help="repositorio remoto: acepta el plan sin preguntar (sudo, sesion de gh y descargas pesadas SIEMPRE preguntan)")
+            p.add_argument("--solo-clonar", action="store_true", help="repositorio remoto: solo comprobar acceso y clonar (sin paquetes, GitHub ni entorno)")
+            p.add_argument("--plan", action="store_true", help="repositorio remoto: solo muestra el plan completo")
             p.add_argument("--modo", choices=("adopt", "init", "update", "migrar"))
             p.add_argument("--partida", choices=("A", "B", "C"))
             p.add_argument("--acceso"); p.add_argument("--politica"); p.add_argument("--proyecto")
@@ -925,6 +970,12 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
         elif sub == "update":
             p.add_argument("instancia", nargs="?")
             p.add_argument("--aplicar", action="store_true", help="escribe; sin esto solo se muestra el plan")
+        elif sub == "montar":
+            p.add_argument("instancia", nargs="?", help="carpeta de la instancia (por defecto, la actual)")
+            p.add_argument("--agentes", help="lista separada por comas; sin esto detecta los que hay")
+            p.add_argument("--aplicar", action="store_true", help="escribe; sin esto solo se muestra el plan")
+            p.add_argument("--si", action="store_true", help="salta solo las preguntas de bajo riesgo")
+            p.add_argument("--json", action="store_true")
         else:
             p.add_argument("instancia", nargs="?")
             p.add_argument("--json", action="store_true")
@@ -936,6 +987,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             return cmd_instalar(a, out, raiz)
         if sub == "update":
             return cmd_update(a, out, raiz)
+        if sub == "montar":
+            return cmd_montar(a, out, raiz)
         base = a.instancia or os.getcwd()
         if sub == "doctor":
             filas = doctor(base if (a.instancia or (Path(base) / "harness.lock").exists()) else None, raiz)

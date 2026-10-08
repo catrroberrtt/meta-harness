@@ -22,10 +22,10 @@ class Base(unittest.TestCase):
         self.home.mkdir()
         self.paquete = self.crear_paquete("0.2.0")
 
-    def crear_paquete(self, version, suma=None):
+    def crear_paquete(self, version, suma=None, programa=b"#!/bin/sh\necho harness\n"):
         ruta = self.t / f"meta-harness-{version}.tar.gz"
         with tarfile.open(ruta, "w:gz") as tf:
-            datos = b"#!/bin/sh\necho harness\n"
+            datos = programa
             ti = tarfile.TarInfo(f"meta-harness-{version}/cli/harness")
             ti.size, ti.mode = len(datos), 0o755
             tf.addfile(ti, io.BytesIO(datos))
@@ -144,6 +144,45 @@ class TestArranque(Base):
         codigo = "\n".join(l for l in texto.splitlines() if not l.lstrip().startswith("#"))
         self.assertNotRegex(codigo, r"\bsudo\b")
         self.assertNotIn("password", codigo.lower())
+
+
+class TestRelevoAInstancia(Base):
+    PROGRAMA = b'#!/bin/sh\necho "ARGS: $*" > "$HOME/args.txt"\ncat > "$HOME/stdin.txt"\n'
+
+    def paquete_con_relevo(self):
+        return self.crear_paquete("0.4.0", programa=self.PROGRAMA)
+
+    def test_relevo_reconecta_stdin_a_la_terminal_y_pasa_los_argumentos(self):
+        tty = self.t / "tty"
+        tty.write_text("respuesta-de-terminal\n")
+        r = self.correr("--origen", str(self.paquete_con_relevo()), "--si", "--instancia", "owner/nombre",
+                        "--destino", "mi-carpeta", extra_env={"MH_TTY": str(tty)}, entrada="tuberia-curl\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((self.home / "args.txt").read_text().strip(), "ARGS: instalar owner/nombre --destino mi-carpeta --si")
+        self.assertEqual((self.home / "stdin.txt").read_text(), "respuesta-de-terminal\n")   # no la tuberia
+        self.assertIn("Despues:     harness instalar owner/nombre", r.stdout)
+
+    def test_sin_terminal_dice_que_ejecutar_y_no_relevea(self):
+        r = self.correr("--origen", str(self.paquete_con_relevo()), "--si", "--instancia", "owner/nombre",
+                        extra_env={"MH_TTY": str(self.t / "no-existe")})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse((self.home / "args.txt").exists())
+        self.assertIn("ejecuta: harness instalar owner/nombre --si", r.stdout)
+
+    def test_el_plan_menciona_el_relevo_y_no_muestra_credenciales(self):
+        r = self.correr("--origen", str(self.paquete_con_relevo()), "--instancia", "https://u:ghp_SECRETO@h.invalid/o/n.git")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("harness instalar https://h.invalid/o/n.git", r.stdout)
+        self.assertNotIn("ghp_SECRETO", r.stdout + r.stderr)
+
+    def test_instancia_con_caracteres_raros_se_rechaza(self):
+        r = self.correr("--origen", str(self.paquete), "--si", "--instancia", "a/b;rm -rf x")
+        self.assertEqual(r.returncode, 2)
+        self.assertFalse(self.instalado())
+
+    def test_sin_instancia_sigue_el_comportamiento_anterior(self):
+        r = self.correr("--origen", str(self.paquete), "--si")
+        self.assertIn("Siguiente paso: harness (asistente).", r.stdout)
 
 
 if __name__ == "__main__":

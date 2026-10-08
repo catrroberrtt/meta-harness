@@ -59,6 +59,46 @@ PATRONES_SECRETOS = (
 )
 
 
+RUTA_WINDOWS = re.compile(r"^/mnt/[A-Za-z](/|$)")
+
+
+def buscar_nativo(comando, path, wsl):
+    """(ruta_nativa | None, ruta_de_windows | None). En WSL el PATH incluye programas de Windows (/mnt/<unidad>/...):
+    un `command -v` los da por instalados aunque no funcionen en Linux; aqui se ignoran y se informa de ellos aparte."""
+    nativa = windows = None
+    for carpeta in (path or "").split(os.pathsep):
+        if not carpeta:
+            continue
+        candidato = os.path.join(carpeta, comando)
+        if not (os.path.isfile(candidato) and os.access(candidato, os.X_OK)):
+            continue
+        if wsl and (RUTA_WINDOWS.match(carpeta) or RUTA_WINDOWS.match(os.path.realpath(candidato))):
+            windows = windows or candidato
+        else:
+            nativa = candidato
+            break
+    return nativa, windows
+
+
+def es_wsl_real(entorno=None):
+    env = os.environ if entorno is None else entorno
+    if env.get("WSL_DISTRO_NAME") or env.get("WSL_INTEROP"):
+        return True
+    try:
+        with open("/proc/version", encoding="utf-8") as f:
+            return "microsoft" in f.read().lower()
+    except OSError:
+        return False
+
+
+def tty_abierta():
+    """Abre /dev/tty para leer o ejecutar con la terminal de la persona aunque stdin sea una tuberia (`curl | sh`)."""
+    try:
+        return open("/dev/tty", "r+")
+    except OSError:
+        return None
+
+
 def limpiar(texto):
     """Quita de cualquier texto tokens, URLs con credenciales y bloques de llave privada."""
     for patron, reemplazo in PATRONES_SECRETOS:
@@ -72,7 +112,14 @@ class Sistema:
     def __init__(self, home=None):
         self.home = home or os.path.expanduser("~")
 
+    def es_wsl(self):
+        return es_wsl_real()
+
     def existe(self, comando):
+        """Existe como programa NATIVO (en WSL se ignoran los de Windows bajo /mnt/<unidad>/)."""
+        return buscar_nativo(comando, os.environ.get("PATH", ""), self.es_wsl())[0] is not None
+
+    def existe_cualquiera(self, comando):
         return shutil.which(comando) is not None
 
     def ejecutar(self, args, entrada=None, interactivo=False, entorno=None):
@@ -82,7 +129,12 @@ class Sistema:
         env.update(entorno or {})
         try:
             if interactivo:
-                return subprocess.run(args, env=env).returncode, ""
+                tty = None if sys.stdin.isatty() else tty_abierta()
+                try:
+                    return subprocess.run(args, env=env, stdin=tty).returncode, ""
+                finally:
+                    if tty:
+                        tty.close()
             r = subprocess.run(args, input=entrada, capture_output=True, text=True, env=env, timeout=120)
             return r.returncode, (r.stdout or "") + (r.stderr or "")
         except (OSError, subprocess.TimeoutExpired) as e:
@@ -107,7 +159,18 @@ class Sistema:
 
     def preguntar(self, texto, defecto=""):
         try:
-            r = input(texto + " ")
+            if sys.stdin.isatty():
+                r = input(texto + " ")
+            else:   # `curl | sh` consume stdin: las preguntas se leen de la terminal
+                tty = tty_abierta()
+                if tty is None:
+                    return defecto
+                with tty:
+                    tty.write(texto + " ")
+                    tty.flush()
+                    r = tty.readline()
+                    if r == "":
+                        return defecto
         except EOFError:
             return defecto
         return r.strip() or defecto
@@ -205,20 +268,57 @@ class Flujo:
         return 0
 
     # --- paso 2: sesion ---------------------------------------------------------------------
+    BANDERAS_LOGIN = (("--hostname", ["github.com"]), ("--git-protocol", ["ssh"]), ("--web", []), ("--skip-ssh-key", []))
+
+    def comando_login(self):
+        """(comando, banderas_omitidas). Solo usa las banderas que la version instalada de gh lista en su ayuda."""
+        base = ["gh", "auth", "login"]
+        codigo, ayuda = self.correr(base + ["--help"])
+        if codigo != 0:
+            return base, [b for b, _ in self.BANDERAS_LOGIN]
+        cmd, omitidas = list(base), []
+        for bandera, valor in self.BANDERAS_LOGIN:
+            if bandera in ayuda:
+                cmd += [bandera] + valor
+            else:
+                omitidas.append(bandera)
+        return cmd, omitidas
+
+    def entorno_login(self):
+        """En WSL, BROWSER apunta a wslview o explorer.exe (si existen) para que la URL se abra en el navegador de Windows."""
+        if self.s.es_wsl():
+            for programa in ("wslview", "explorer.exe"):
+                if self.s.existe_cualquiera(programa):
+                    return {"BROWSER": programa}
+        return {}
+
     def paso_sesion(self):
         self.dec("[2/7] Sesion en GitHub")
         codigo, _ = self.correr(["gh", "auth", "status"])
         if codigo == 0:
             self.dec("  Ya hay una sesion iniciada.")
             return 0
-        self.dec("  No hay sesion. En otra terminal ejecuta:  gh auth login")
-        self.dec("  IMPORTANTE: en la MISMA maquina y el MISMO sistema donde corre este programa (si usas WSL, dentro de Ubuntu;")
-        self.dec("  una sesion iniciada en PowerShell de Windows NO vale: gh guarda la sesion por sistema).")
-        self.dec("  (inicias sesion tu en el navegador; este programa no ve ni guarda tu contrasena ni tu token).")
-        self.s.preguntar("  Pulsa Enter cuando hayas terminado:", "")
+        cmd, omitidas = self.comando_login()
+        self.dec("  No hay sesion. Se iniciara AQUI, en esta misma terminal y en este mismo sistema:")
+        self.dec("      " + " ".join(cmd))
+        self.dec("  gh te mostrara un codigo de un solo uso y una URL: abre la URL, escribe el codigo y autoriza (lo haces tu en el navegador;")
+        self.dec("  este programa no ve ni guarda tu contrasena ni tu token). --skip-ssh-key evita que gh suba una llave ajena; la llave propia se registra en el paso 4.")
+        if omitidas and len(omitidas) < len(self.BANDERAS_LOGIN):
+            self.dec("  (Tu version de gh no lista %s: se omite y gh te preguntara esa opcion.)" % ", ".join(omitidas))
+        elif omitidas:
+            self.dec("  (No pude leer la ayuda de gh: se usa `gh auth login` sin banderas y gh te hara sus preguntas.)")
+        if self.confirmar("  ¿Iniciar sesion ahora?"):
+            c, _ = self.correr(cmd, interactivo=True, entorno=self.entorno_login())
+            if c != 0:
+                self.dec("  `gh auth login` termino con codigo %s." % c)
+        else:
+            self.dec("  Puedes hacerlo tu:  gh auth login")
+            self.dec("  IMPORTANTE: en la MISMA maquina y el MISMO sistema donde corre este programa (si usas WSL, dentro de Ubuntu;")
+            self.dec("  una sesion iniciada en PowerShell de Windows NO vale: gh guarda la sesion por sistema).")
+            self.s.preguntar("  Pulsa Enter cuando hayas terminado:", "")
         codigo, _ = self.correr(["gh", "auth", "status"])
         if codigo != 0:
-            self.dec("  Sigue sin haber sesion. Me detengo; repite cuando hayas ejecutado `gh auth login`.")
+            self.dec("  Sigue sin haber sesion. Me detengo; repite cuando hayas ejecutado `gh auth login` en este mismo sistema.")
             return 2
         self.dec("  Sesion detectada.")
         return 0

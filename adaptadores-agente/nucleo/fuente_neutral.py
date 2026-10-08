@@ -261,6 +261,7 @@ def construir(instancia, harness_raiz=None):
         "reglas": reglas, "gate": gate, "prohibiciones": prohibiciones,
         "herramientas": herramientas_del_harness(harness_raiz),
         "pendientes": pendientes_de_declarar(pol, conv),
+        "ambientes_datos": [str(a.get("nombre", "?")) for a in ((pol.get("datos") or {}).get("ambientes") or [])],
         "instancia": str(inst), "harness_raiz": str(harness_raiz), "archivo_agents": ARCHIVO_AGENTS,
         "politica_ruta": str(inst / "politicas.toml"),
     }
@@ -269,6 +270,22 @@ def construir(instancia, harness_raiz=None):
 # ----------------------------------------------------------------------------- render de AGENTS.md
 def _md_lista(items, vacio="Nada por ahora."):
     return "\n".join(f"- {x}" for x in items) if items else vacio
+
+
+def texto_acceso_a_datos(ambientes):
+    """Sección fija sobre los datos. La base de datos NO se instala con el harness: cada proyecto accede distinto y el acceso lo da la persona."""
+    base = ("La base de datos es la **fuente de evidencia más fuerte** de este proyecto, y el harness **no la instala ni la levanta**: "
+            "cada proyecto accede a ella de una forma distinta, así que el acceso lo da la persona. "
+            "Sin ese acceso trabajas en **modo degradado**: no afirmes nada sobre datos (cifras, estados, existencia de registros) como verificado; "
+            "di «no verificado» y pide el acceso.")
+    como = ("Para darlo: la persona declara los ambientes en `politicas.toml` (`[[datos.ambientes]]`), pone su acceso personal en "
+            "`acceso.local.toml` (no se versiona ni lleva secretos en el repositorio) y comprueba con `instalador/preflight-accesos.py` del harness. "
+            "Nunca pidas ni escribas contraseñas en un archivo versionado, y nunca te conectes a un ambiente que la política no declare.")
+    if ambientes:
+        estado = "Ambientes declarados en la política: " + ", ".join(f"«{n}»" for n in ambientes) + ". Que estén declarados no significa que haya acceso: el preflight lo comprueba."
+    else:
+        estado = "La política **no declara ningún ambiente de datos**: no hay acceso configurado y no debes suponer ninguno."
+    return base + "\n\n" + como + "\n\n" + estado
 
 
 def render_agents_md(fuente, harness_raiz=None):
@@ -294,6 +311,7 @@ def render_agents_md(fuente, harness_raiz=None):
         "MARCA": MARCA, "PROYECTO": fuente["proyecto"], "VERSION_HARNESS": str(fuente["version_harness"]),
         "ORIENTACION": _md_lista(fuente["orientacion"]), "CUANDO_LEER": cuando,
         "REGLAS": "\n".join(reglas).strip() if reglas else "La política no declara reglas todavía.",
+        "DATOS": texto_acceso_a_datos(fuente.get("ambientes_datos") or []),
         "GATE": gate, "PROHIBICIONES": _md_lista(fuente["prohibiciones"]),
         "HERRAMIENTAS": ("Rutas relativas a la raíz del harness (la ruta está en `harness.lock`, clave `fuente`):\n\n" + _md_lista(herr)) if herr else "No se encontraron herramientas.",
         "PENDIENTES": _md_lista(fuente["pendientes"], "Nada pendiente de declarar."),

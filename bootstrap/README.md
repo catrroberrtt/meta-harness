@@ -20,6 +20,14 @@ Sin `--version` toma la última etiqueta `X.Y.Z` del repositorio. Lo que hace, e
 
 Nunca usa privilegios de administrador, nunca pide ni guarda credenciales.
 
+## Todo en un comando (`--instancia`)
+
+```sh
+curl -fsSL https://<host>/<organizacion>/meta-harness/releases/download/vX.Y.Z/instalar.sh | sh -s -- --instancia owner/nombre
+```
+
+Tras instalar `harness`, el script le pasa el relevo (`harness instalar owner/nombre [--destino CARPETA] [--si]`) reconectando la entrada a `/dev/tty` (`curl | sh` consume stdin). Sin terminal no hace el relevo: imprime el comando exacto. El plan del arranque anuncia ese relevo; el plan completo (paquetes, GitHub, clon, entorno) lo muestra y confirma `harness`. Detalle del flujo y de lo que siempre pregunta: `docs/UNICO-COMANDO.md`. El valor de `--instancia` solo admite `owner/nombre` o una URL; cualquier `usuario:token@` se descarta al mostrarse.
+
 ## Verificación manual de la suma
 
 No tienes que fiarte del script: descarga ambos archivos y compara tú mismo.
@@ -36,7 +44,7 @@ Este script es **público y genérico**: no contiene ni ejecuta nada de ninguna 
 
 ## Pruebas sin red
 
-`--origen meta-harness-X.Y.Z.tar.gz` usa un archivo local y su `meta-harness-X.Y.Z.tar.gz.sha256` en lugar de descargar. Variables: `MH_REPO`, `MH_URL_BASE`, `MH_PYTHON`. 
+`--origen meta-harness-X.Y.Z.tar.gz` usa un archivo local y su `meta-harness-X.Y.Z.tar.gz.sha256` en lugar de descargar. Variables: `MH_REPO`, `MH_URL_BASE`, `MH_PYTHON`, `MH_TTY` (terminal a usar; por defecto `/dev/tty`). 
 
 ## Al publicar el repositorio central (un solo lugar)
 

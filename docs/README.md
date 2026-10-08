@@ -8,3 +8,8 @@ Especificación resumida del meta harness (`SPEC.md`), decisiones y notas de ver
 ## Origen
 
 Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia (parametrizacion).
+
+## Instalación
+
+- `UNICO-COMANDO.md`: de una máquina limpia a una instancia lista con un solo comando.
+- `ENTORNO-INSTANCIA.md`: contrato opcional `.harness/entorno.toml` de la instancia.

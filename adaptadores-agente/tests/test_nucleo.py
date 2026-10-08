@@ -115,6 +115,37 @@ class TestAgentsMd(Base):
         self.assertEqual(antes, arbol_hash(self.tmp))
         self.assertFalse((self.inst / "AGENTS.md").exists())
 
+    def test_agents_md_siempre_dice_que_los_datos_los_da_la_persona(self):
+        # Decisión del dueño: la base de datos NO se instala; es la evidencia más fuerte y el acceso lo da la persona.
+        self.assertEqual(self.aplicar()[0], 0)
+        texto = (self.inst / "AGENTS.md").read_text(encoding="utf8")
+        self.assertIn("## Acceso a datos (lo da la persona)", texto)
+        for frase in ("fuente de evidencia más fuerte", "no la instala ni la levanta", "modo degradado", "acceso.local.toml",
+                      "preflight-accesos.py", "no verificado"):
+            self.assertIn(frase, texto)
+        self.assertLess(texto.index("## Acceso a datos"), texto.index("## Gate de calidad"))
+
+    def test_sin_ambientes_declarados_dice_que_no_hay_acceso(self):
+        self.assertEqual(self.aplicar()[0], 0)
+        base = (self.inst / "AGENTS.md").read_text(encoding="utf8")
+        sec = base.split("## Acceso a datos (lo da la persona)")[1].split("## Gate de calidad")[0]
+        if "no declara ningún ambiente de datos" in sec:
+            self.assertIn("no debes suponer ninguno", sec)
+        else:
+            self.assertIn("Ambientes declarados en la política", sec)
+            self.assertIn("no significa que haya acceso", sec)
+
+    def test_con_ambientes_los_nombra_sin_afirmar_acceso(self):
+        fuente = fn.construir(self.inst)
+        fuente = dict(fuente, ambientes_datos=["ambiente-uno", "ambiente-dos"])
+        texto = fn.render_agents_md(fuente)
+        sec = texto.split("## Acceso a datos (lo da la persona)")[1].split("## Gate de calidad")[0]
+        self.assertIn("«ambiente-uno», «ambiente-dos»", sec)
+        self.assertIn("no significa que haya acceso", sec)
+        sin = fn.render_agents_md(dict(fuente, ambientes_datos=[]))
+        self.assertIn("no declara ningún ambiente de datos", sin)
+        self.assertIn("no debes suponer ninguno", sin)
+
     def test_regenerar_dos_veces_es_identico(self):
         self.assertEqual(self.aplicar()[0], 0)
         h1 = arbol_hash(self.inst)

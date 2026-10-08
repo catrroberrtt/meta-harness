@@ -586,6 +586,35 @@ class TestInstalarRemoto(Base):
         run.assert_not_called()
 
 
+class TestInstalarCompleto(Base):
+    """`harness instalar owner/nombre` sin dobles del flujo corto -> orquestador (un solo comando)."""
+
+    def test_repositorio_va_al_orquestador_y_solo_clonar_al_flujo_corto(self):
+        llamadas = []
+        with mock.patch.object(hc, "instalar_completo", side_effect=lambda a, o, r: llamadas.append(a.instancia) or 0), \
+                mock.patch.object(hc, "instalar_remoto", side_effect=lambda a, o, r: llamadas.append("corto") or 0):
+            hc.main(["instalar", "acme/instancia"], salida=StringIO())
+            hc.main(["instalar", "acme/instancia", "--solo-clonar"], salida=StringIO())
+            with mock.patch.dict(hc.HOOKS_REMOTO, {"es_terminal": False}):
+                hc.main(["instalar", "acme/instancia"], salida=StringIO())
+        self.assertEqual(llamadas, ["acme/instancia", "corto", "corto"])
+
+    def test_plan_completo_sin_escribir_ni_ejecutar(self):
+        buf = StringIO()
+        with mock.patch("subprocess.run") as run:
+            c = hc.main(["instalar", "acme/instancia", "--plan", "--destino", str(self.tmp / "d")], salida=buf)
+        run.assert_not_called()
+        self.assertEqual(c, 0)
+        self.assertIn("PLAN (todavia no se ha escrito nada)", buf.getvalue())
+        self.assertIn("EN ESTA TERMINAL", buf.getvalue())
+        self.assertFalse((self.tmp / "d").exists())
+
+    def test_carpeta_local_sigue_igual(self):
+        with mock.patch.object(hc, "instalar_completo") as ic:
+            hc.main(["instalar", str(self.tmp / "no-existe-local"), "--partida", "B"], salida=StringIO())
+        ic.assert_not_called()
+
+
 class TestEjecutable(unittest.TestCase):
     def test_help_por_el_script(self):
         import subprocess
@@ -605,6 +634,49 @@ class TestEjecutable(unittest.TestCase):
         self.assertIn("sin escribir", r.stdout)
         self.assertEqual(sorted(p.name for p in d.iterdir()), ["n"])
         self.assertEqual(os.listdir(d / "n"), ["README.md"])
+
+
+class TestMontar(unittest.TestCase):
+    """`harness montar`: monta el entorno de los agentes sobre una instancia ya creada."""
+
+    def setUp(self):
+        import subprocess as sp, tempfile, shutil
+        self.sp = sp
+        self.t = Path(tempfile.mkdtemp(prefix="mh-montar-"))
+        self.addCleanup(shutil.rmtree, self.t, True)
+        (self.t / "docs").mkdir()
+        (self.t / "docs" / "a.md").write_text("# idea\n", encoding="utf8")
+        (self.t / "acc.toml").write_text('[documentacion]\nmetodo = "carpeta_repo"\ncarpeta = "%s"\n' % (self.t / "docs"), encoding="utf8")
+        raiz = Path(__file__).resolve().parents[2]
+        self.raiz = raiz
+        r = sp.run(["bash", str(raiz / "instalador" / "instalar.sh"), "init", str(self.t / "inst"), "--partida", "B",
+                    "--acceso", str(self.t / "acc.toml"), "--aplicar"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.inst = self.t / "inst"
+
+    def harness(self, *args):
+        return self.sp.run([sys.executable, str(self.raiz / "cli" / "harness"), *args], capture_output=True, text=True, stdin=self.sp.DEVNULL)
+
+    def test_montar_es_un_subcomando(self):
+        self.assertIn("montar", hc.SUBCOMANDOS)
+
+    def test_sin_aplicar_solo_muestra_el_plan_y_no_escribe(self):
+        r = self.harness("montar", str(self.inst), "--agentes", "claude-code")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("PLAN", r.stdout)
+        self.assertFalse((self.inst / "AGENTS.md").exists())
+
+    def test_con_aplicar_y_si_monta_y_recuerda_que_los_datos_los_da_la_persona(self):
+        r = self.harness("montar", str(self.inst), "--agentes", "claude-code", "--aplicar", "--si")
+        self.assertIn(r.returncode, (0,), r.stdout + r.stderr)
+        self.assertTrue((self.inst / "AGENTS.md").is_file())
+        informe = (self.inst / ".harness" / "montaje.md").read_text(encoding="utf8")
+        self.assertIn("Acceso a datos (lo das tú)", informe)
+        self.assertIn("NO la instala", informe)
+
+    def test_instancia_inexistente_falla_con_mensaje(self):
+        r = self.harness("montar", str(self.t / "no-existe"))
+        self.assertNotEqual(r.returncode, 0)
 
 
 if __name__ == "__main__":

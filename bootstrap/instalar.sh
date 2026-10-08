@@ -1,21 +1,27 @@
 #!/bin/sh
-# Arranque de meta-harness. Uso: curl -fsSL <url>/instalar.sh | sh -s -- [--version X.Y.Z] [--si]
+# Arranque de meta-harness. Uso: curl -fsSL <url>/instalar.sh | sh -s -- [--version X.Y.Z] [--si] [--instancia owner/nombre [--destino CARPETA]]
+# Con --instancia, tras instalar el comando `harness` le pasa el relevo (`harness instalar owner/nombre`): paquetes, GitHub, clon y entorno.
 # Muestra el plan ANTES de escribir, comprueba el sha256 de lo descargado y no pide privilegios de administrador ni credenciales.
-# Opciones: --version X.Y.Z  --si (sin preguntar)  --origen ARCHIVO.tar.gz (local, con ARCHIVO.tar.gz.sha256; sin red)
+# Opciones: --version X.Y.Z  --si (sin preguntar lo de bajo riesgo)  --instancia owner/nombre  --destino CARPETA  --origen ARCHIVO.tar.gz (local, con ARCHIVO.tar.gz.sha256; sin red)
 set -eu
 # UNICO lugar donde vive la URL del repositorio central (un fork la cambia aqui, o define MH_REPO / MH_URL_BASE, o usa --origen).
 REPO="${MH_REPO:-https://github.com/catrroberrtt/meta-harness}"   # repositorio publico (git)
 BASE="${MH_URL_BASE:-$REPO/releases/download}"                    # <BASE>/vX.Y.Z/meta-harness-X.Y.Z.tar.gz[.sha256]
 PY="${MH_PYTHON:-python3}"
-VERSION="" SI=0 ORIGEN=""
+VERSION="" SI=0 ORIGEN="" INSTANCIA="" DESTINO=""
+TTY="${MH_TTY:-/dev/tty}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --version) VERSION="${2:?falta X.Y.Z}"; shift 2 ;;
     --si) SI=1; shift ;;
+    --instancia) INSTANCIA="${2:?falta owner/nombre}"; shift 2 ;;
+    --destino) DESTINO="${2:?falta la carpeta}"; shift 2 ;;
     --origen) ORIGEN="${2:?falta el archivo}"; shift 2 ;;
     *) echo "Opcion desconocida: $1" >&2; exit 2 ;;
   esac
 done
+case "$INSTANCIA" in *[!A-Za-z0-9_./:@~-]*) echo "--instancia solo admite owner/nombre o una URL de repositorio." >&2; exit 2 ;; esac
+OCULTAR='s|\(://\)[^/@]*@|\1|'   # nunca se muestra usuario:token@
 SIN_PUBLICAR="El repositorio central aún no está publicado: define MH_URL_BASE o usa --origen. No se descargo ni se instalo nada."
 if [ -z "$ORIGEN" ]; then   # con el marcador sin reemplazar no se intenta ninguna descarga
   case "$BASE" in *ORGANIZACION*) echo "$SIN_PUBLICAR" >&2; exit 1 ;; esac
@@ -43,9 +49,13 @@ echo "  Comprobar: sha256 contra $FUENTE.sha256 (si no coincide, se aborta)"
 echo "  Version:   $VERSION"
 echo "  Instalar en: $DEST"
 echo "  Enlace:      $ENLACE (no se toca el PATH; sin privilegios de administrador; no se piden credenciales)"
+if [ -n "$INSTANCIA" ]; then
+  echo "  Despues:     harness instalar $(printf '%s' "$INSTANCIA" | sed "$OCULTAR")  (relevo automatico: UN plan con paquetes, GitHub, clon y entorno;"
+  echo "               lo delicado -administrador, sesion en el navegador, descargas pesadas- se pregunta aparte)"
+fi
 if [ "$SI" != 1 ]; then
-  if ( : </dev/tty ) 2>/dev/null; then
-    printf "Aplicar este plan? [s/N] " >&2; read -r r </dev/tty || r=""
+  if ( : <"$TTY" ) 2>/dev/null; then
+    printf "Aplicar este plan? [s/N] " >&2; read -r r <"$TTY" || r=""
     case "$r" in s|S|si|SI|y|Y) ;; *) echo "Cancelado. No se escribio nada."; exit 0 ;; esac
   else echo "Sin terminal y sin --si: solo se mostro el plan. No se instalo nada."; exit 0; fi
 fi
@@ -70,4 +80,14 @@ if [ -e "$ENLACE" ] && [ ! -L "$ENLACE" ]; then echo "Aviso: $ENLACE existe y no
 else ln -sfn "$DEST/cli/harness" "$ENLACE"; fi
 echo "Instalado: $DEST"
 case ":$PATH:" in *":$(dirname "$ENLACE"):"*) ;; *) echo "Agrega $(dirname "$ENLACE") a tu PATH, por ejemplo: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;; esac
-echo "Siguiente paso: harness (asistente)."
+if [ -z "$INSTANCIA" ]; then echo "Siguiente paso: harness (asistente)."; exit 0; fi
+# Relevo: `curl | sh` consumio stdin, asi que el comando se reconecta a la terminal; sin terminal solo se dice que ejecutar.
+set -- instalar "$INSTANCIA"
+[ -z "$DESTINO" ] || set -- "$@" --destino "$DESTINO"
+[ "$SI" != 1 ] || set -- "$@" --si
+if ( : <"$TTY" ) 2>/dev/null; then
+  echo "Relevo: harness $*" | sed "$OCULTAR"
+  trap - EXIT INT TERM; rm -rf "$TMP"
+  exec "$DEST/cli/harness" "$@" <"$TTY"
+fi
+echo "Sin terminal para continuar. Cuando tengas una, ejecuta: harness $*" | sed "$OCULTAR"

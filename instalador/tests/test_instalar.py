@@ -126,6 +126,12 @@ class TestMigrar(Base):
         self.assertTrue((self.inst / "mejoras.md").exists())
 
 
+def version_mas_nueva():
+    """Una versión estrictamente mayor que la real de este harness (la prueba no puede depender de un número escrito a mano)."""
+    mayor, menor, parche = (int(x) for x in (RAIZ / "VERSION").read_text().strip().split("."))
+    return f"{mayor}.{menor}.{parche + 1}"
+
+
 class TestUpdate(Base):
     def copia_harness(self, version):
         h = self.tmp / "harness2"
@@ -143,9 +149,10 @@ class TestUpdate(Base):
         (self.inst / "acceso.local.toml").write_text("[documentacion]\nmetodo = \"carpeta_repo\"\n")
         (self.inst / "conocimiento" / "tema.md").write_text("negocio\n")
         # harness nuevo: cambia la plantilla del README y de dos carpetas
-        h = self.copia_harness("0.2.0")
+        nueva = version_mas_nueva()
+        h = self.copia_harness(nueva)
         base = h / "plantillas" / "instancia"
-        (base / "README.md").write_text((base / "README.md").read_text() + "\nNovedad 0.2.0\n")
+        (base / "README.md").write_text((base / "README.md").read_text() + f"\nNovedad {nueva}\n")
         (base / "cambios" / "README.md").write_text("nuevo del harness\n")
         antes = {r: (self.inst / r).read_text() for r in
                  ("cambios/README.md", "politicas.toml", "convenciones.toml", "mejoras.md", "acceso.local.toml",
@@ -153,15 +160,15 @@ class TestUpdate(Base):
         c, out = correr("update", self.inst, "--harness", h)
         self.assertEqual(c, 0, out)
         self.assertIn("NO se escribio nada", out)
-        self.assertNotIn("Novedad 0.2.0", (self.inst / "README.md").read_text())
+        self.assertNotIn(f"Novedad {nueva}", (self.inst / "README.md").read_text())
         c, out = correr("update", self.inst, "--harness", h, "--aplicar")
         self.assertEqual(c, 0, out)
-        self.assertIn("Novedad 0.2.0", (self.inst / "README.md").read_text())        # lo propio, actualizado
+        self.assertIn(f"Novedad {nueva}", (self.inst / "README.md").read_text())        # lo propio, actualizado
         self.assertIn("[modificado-local] cambios/README.md", out)                    # lo modificado, reportado
         self.assertIn("nuevo del harness", out)                                        # mostrando que cambiaria
         for r, v in antes.items():
             self.assertEqual((self.inst / r).read_text(), v, r)
-        self.assertEqual(tomllib.loads((self.inst / "harness.lock").read_text())["version"], "0.2.0")
+        self.assertEqual(tomllib.loads((self.inst / "harness.lock").read_text())["version"], nueva)
         h2 = arbol_hash(self.inst)
         c, out = correr("update", self.inst, "--harness", h, "--aplicar")
         self.assertEqual(h2, arbol_hash(self.inst))                                    # idempotente

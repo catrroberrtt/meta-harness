@@ -109,7 +109,8 @@ def main(argv=None, comprobar=acceso_por_defecto, ejecutar=ejecutar_por_defecto,
     if a.solo_lectura:
         decir("  Modo solo lectura: se clona y se comprueba la version; no se ejecuta `update --aplicar`.")
     else:
-        decir("  Luego: instalar.sh update %s --aplicar (fija y comprueba la version; no toca nada fuera del destino)." % destino)
+        decir("  Luego, SI la instancia trae harness.lock: instalar.sh update %s --aplicar (fija y comprueba la version)." % destino)
+        decir("  Si no lo trae (instancia anterior al instalador) no se ejecuta `update`: solo se clona.")
     decir("  Si la instancia trae `restaurar.sh`, no se ejecuta sin tu confirmacion en terminal.")
     if not a.si:
         if not tty:
@@ -132,7 +133,9 @@ def main(argv=None, comprobar=acceso_por_defecto, ejecutar=ejecutar_por_defecto,
         estado = "coincide con la instalada" if fijada == version else "DIFIERE de la instalada (%s)" % version
         decir("harness.lock fija la version %s: %s." % (fijada, estado))
     else:
-        decir("La instancia no trae harness.lock; `update` lo fijara.")
+        decir("La instancia no trae harness.lock: es anterior al instalador, asi que NO se ejecuta `update` (exige ese archivo).")
+        decir("Esta clonada y lista para usarse con su propio proceso de restauracion; adoptarla en el harness es un paso aparte.")
+        return _pendiente_restaurar(destino, decir)
     cmd = ["bash", str(raiz / "instalador" / "instalar.sh"), "update", str(destino)]
     if not a.solo_lectura:
         cmd.append("--aplicar")
@@ -148,6 +151,15 @@ def main(argv=None, comprobar=acceso_por_defecto, ejecutar=ejecutar_por_defecto,
             decir(limpiar((p.stdout or "").rstrip()))
             return 0 if p.returncode == 0 else 4
         decir("Pendiente: revisa y ejecuta tu mismo `bash %s/restaurar.sh` (no se ejecuta sin confirmacion en terminal)." % destino)
+    return 0
+
+
+def _pendiente_restaurar(destino, decir):
+    """Avisa del restaurador que la instancia traiga (nunca lo ejecuta: lo corre la persona)."""
+    for rel in ("scripts/restaurar-entorno.sh", "restaurar.sh"):
+        if (destino / rel).is_file():
+            decir("Pendiente (lo corres tu, primero el plan): bash %s/%s" % (destino, rel))
+            return 0
     return 0
 
 

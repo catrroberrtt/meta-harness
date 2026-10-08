@@ -62,6 +62,24 @@ class TestInstanciaConAcceso(Base):
         self.assertIn("Pendiente", out)  # restaurar.sh no se ejecuta con --si
         self.assertFalse(any("restaurar.sh" in " ".join(c) for c in self.llamadas))
 
+    def test_instancia_anterior_al_instalador_se_clona_sin_update(self):
+        # Hallazgo de la prueba real: una instancia sin harness.lock terminaba en error porque `update` exige ese archivo.
+        (self.remoto / "harness.lock").unlink()
+        (self.remoto / "restaurar.sh").unlink()
+        (self.remoto / "scripts").mkdir()
+        (self.remoto / "scripts" / "restaurar-entorno.sh").write_text("echo hola\n")
+        git(self.remoto, "add", "-A")
+        git(self.remoto, "commit", "-qm", "sin lock")
+        dest = self.work / "inst"
+        cod, out = self.correr(str(self.remoto), "--destino", str(dest), "--si")
+        self.assertEqual(cod, 0, out)
+        self.assertTrue((dest / "scripts" / "restaurar-entorno.sh").is_file())
+        self.assertIn("anterior al instalador", out)
+        self.assertFalse(any("update" in c for c in self.llamadas), "no debe ejecutar update sin harness.lock")
+        self.assertIn("Pendiente", out.split("Clonado")[1])
+        self.assertIn("restaurar-entorno.sh", out.split("Clonado")[1])   # lo deja como pendiente
+        self.assertFalse(any("restaurar-entorno.sh" in " ".join(c) for c in self.llamadas), "nunca lo ejecuta")
+
     def test_lock_con_otra_version_se_informa(self):
         (self.remoto / "harness.lock").write_text('version = "9.9.9"\nfuente = "x"\n')
         git(self.remoto, "commit", "-qam", "v")

@@ -465,7 +465,8 @@ class Trazabilidad(Base):
             E.escribir(inst, p)
             c, d = self.correr(inst / "cambios" / "erp-composicion", "especificacion")
             self.assertEqual(c, 0, (rubro, d))
-            self.assertEqual(d["errores"] if "errores" in d else 0, 0)
+            self.assertEqual(d["resumen"]["errores"], 0)
+            self.assertEqual(d["resumen"]["requisitos"], len(p["modulos"]))
             texto = (inst / "cambios" / "erp-composicion" / "especificacion.md").read_text(encoding="utf-8")
             self.assertEqual(texto.count("\n- RQ-"), len(p["modulos"]))
 

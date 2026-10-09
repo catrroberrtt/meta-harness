@@ -13,3 +13,9 @@ Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia 
 
 - `UNICO-COMANDO.md`: de una máquina limpia a una instancia lista con un solo comando.
 - `ENTORNO-INSTANCIA.md`: contrato opcional `.harness/entorno.toml` de la instancia.
+
+## Uso diario y método
+
+- `MAPA-DE-COMANDOS.md`: qué comando uso cuándo (empresa con estándar propio, entorno centralizado, proyecto nuevo).
+- `../metodo/terminado-y-trazabilidad.md`: la cadena de punta a punta, la matriz de trazabilidad y la lista de cierre.
+- `ANALISIS-CLAUDE-SKILLS.md`: qué se rescató y qué no de un catálogo público de skills, con atribución.

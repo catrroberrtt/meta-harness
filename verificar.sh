@@ -21,7 +21,7 @@ done < <(find . -name '*.py' -not -path './.git/*' | sort)
 [ "$FALLOS" -eq "$P0" ] && ok
 
 paso "3. pruebas unittest"
-for d in herramientas/tests instalador/tests cli/tests adaptadores-agente/tests; do
+for d in herramientas/tests instalador/tests cli/tests adaptadores-agente/tests bootstrap/tests; do
   if [ -d "$d" ]; then
     echo " - $d"
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$d" -p 'test_*.py' || mal "unittest en $d"

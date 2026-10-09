@@ -42,6 +42,10 @@ En los tres modos se instala como mínimo: (a) toda especificación se valida **
 3. La instancia fija la versión en `harness.lock`, guarda sus convenciones (partiendo de `convenciones/estandar.md`) y su conocimiento propio.
 4. Las acciones hacia afuera (crear repositorios, pedir permisos, publicar) se muestran y esperan confirmación; nunca se guardan credenciales.
 
+## Terminado y trazabilidad
+
+Cada cambio recorre la misma cadena (propuesta, análisis, especificación, delegación, implementación, revisión, verificación, cierre) y deja un rastro que se comprueba con un guion: `metodo/terminado-y-trazabilidad.md`, plantillas en `plantillas/` (ejemplo ejecutable en `plantillas/ejemplos/cambio-ejemplo/`) y `harness trazar <cambio>`. Qué comando usar en cada momento: `docs/MAPA-DE-COMANDOS.md` (o `harness -h`). Comparación con otro catálogo de skills público: `docs/ANALISIS-CLAUDE-SKILLS.md`.
+
 ## Estado
 
 Esqueleto (0.1.x): estructura, contratos de adaptadores, plantilla de convenciones, `adopt` funcional y dos herramientas genéricas. El resto de documentos llega a cada carpeta solo cuando supera la medición (tipo declarado y especificidad 0).

@@ -1,7 +1,7 @@
 # Adaptador: Diseño web
 
 <!-- tipo: adaptador · capa: 3 -->
-<!-- revisado: 2026-10-08 · vence: 90d · fuente: contrato de adaptadores del repositorio y docs/ANALISIS-OPEN-DESIGN.md -->
+<!-- revisado: 2026-10-09 · vence: 90d · fuente: contrato de adaptadores del repositorio y docs/ANALISIS-OPEN-DESIGN.md -->
 
 ## Específico de `diseno-web`
 
@@ -50,8 +50,8 @@ El método solo conoce estas operaciones.
 ## Invocación de la herramienta externa (sin depender de ella)
 
 1. `detectar-herramienta()`. Si dice `no`, ir al **modo manual**; no es un error.
-2. Si dice `sí`, mostrar a la persona **antes de ejecutar**: qué herramienta es, que puede enviar el brief y el contenido a su proveedor de modelos y, según su configuración, telemetría al proyecto (ver `docs/ANALISIS-OPEN-DESIGN.md` §4), y pedir confirmación. Sin `permiso_red: sí` no se sigue por esta vía.
-3. Pasar a la herramienta **solo** el brief completo, `sitio/tokens.css` y `sitio/DISENO.md`; nunca credenciales, datos de clientes ni contenido del ERP. Usar el sistema de diseño **de la empresa** (la ficha de marca), **no** uno de los sistemas «inspirados en marcas» que la herramienta trae de fábrica (`estandares/diseno-web.md` §6).
+2. Si dice `sí`, mostrar a la persona **antes de ejecutar**: qué herramienta es, que puede enviar el brief y el contenido a su proveedor de modelos y, según su configuración, telemetría al proyecto (ver `docs/ANALISIS-OPEN-DESIGN.md` §4), y pedir confirmación. **Regla de telemetría (decisión 2026-10-09):** una herramienta externa de diseño se ejecuta **solo dentro de un contenedor sin telemetría** (sin salida de red hacia el proyecto de la herramienta ni hacia analítica) **y con la confirmación explícita de la persona**, dada para esa ejecución. Si falta cualquiera de las dos cosas, **modo manual**. Sin `permiso_red: sí` tampoco se sigue por esta vía.
+3. Pasar a la herramienta **solo** el brief completo, `sitio/tokens.css` y `sitio/DISENO.md`; nunca credenciales, datos de clientes ni contenido del ERP. Usar el sistema de diseño **de la empresa** (la ficha de marca) o uno **genérico sin marca**; los sistemas «inspirados en marcas reales» (Stripe, Apple, BMW…) que la herramienta trae de fábrica están **prohibidos** en este flujo, ni siquiera como referencia a imitar (decisión 2026-10-09; `estandares/diseno-web.md` §6).
 4. Traer el resultado a `sitio/`, **revisarlo línea a línea** (es contenido generado), completar `activos/LICENCIAS.md` y seguir con `verificar-sitio`.
 
 Las órdenes concretas de cada herramienta (p. ej. `od …`) son de la herramienta, cambian entre versiones y **no** se fijan aquí; se leen de su documentación el día que se usa y se declaran «no verificado» hasta ejecutarlas.
@@ -86,17 +86,25 @@ Automáticos: `python3 herramientas/web-verificar-sitio.py sitio/` debe salir co
 | 13 | Rendimiento real (carga en red móvil lenta) | **a mano** con la herramienta de la instancia |
 | 14 | Cada afirmación comercial corresponde a un módulo realmente instalado o a un hecho real de la empresa | **a mano**, contra `modulos_erp` |
 | 15 | Textos legales (privacidad, cookies, términos) revisados por la empresa | **a mano** |
-| 16 | Marca: ningún elemento imita la identidad de otra empresa | **a mano** |
+| 16 | Marca: ningún elemento imita la identidad de otra empresa | **a mano**; el verificador ayuda: marca como error `marca-ajena` una ficha `DISENO.md` «inspirada en» o «al estilo de» una marca real |
 
 Lo marcado «a mano» queda anotado con fecha y autor en `INFORME-VERIFICACION.md`. Lo que no se comprobó se escribe **no verificado**.
 
 ## Activos
 
-Todo activo (imagen, icono, fuente, ilustración) entra con origen, autoría y licencia en `activos/LICENCIAS.md`. Las fuentes se **sirven desde el propio sitio** (no desde un servicio remoto) salvo decisión declarada en el brief. Sin licencia clara no entra.
+Todo activo (imagen, icono, fuente, ilustración) entra con origen, autoría y licencia en `activos/LICENCIAS.md`. Las fuentes tipográficas se **alojan en local**, dentro del propio sitio: nunca desde Google Fonts ni otro servicio remoto (decisión 2026-10-09; el verificador ya lo exige con `recurso-remoto`). Sin licencia clara no entra.
 
 ## Autenticación y cuando no existe
 
 Como en todo adaptador: nunca se guardan credenciales en el repositorio ni en la instancia. Las claves de la herramienta o del proveedor de modelos las guarda la persona en su entorno, fuera de los repositorios. Si la herramienta no existe, el adaptador declara `disponible: no`, **no falla**, usa el modo manual y lo informa. Las publicaciones se muestran y esperan confirmación.
+
+## Decisiones registradas (2026-10-09)
+
+| # | Decisión | Dónde se aplica |
+|---|---|---|
+| 1 | Los sistemas de diseño «inspirados en marcas reales» quedan **prohibidos** en este flujo, ni como referencia a imitar. Solo sistemas propios de la empresa o genéricos sin marca | «Invocación» paso 3, punto 16, `estandares/diseno-web.md` §6, verificador (`marca-ajena`) |
+| 2 | Telemetría de herramientas externas de diseño: solo dentro de un contenedor sin telemetría **y** con confirmación explícita; si no, modo manual | «Invocación» paso 2, `estandares/diseno-web.md` §7 |
+| 3 | Fuentes tipográficas remotas: se alojan en local | «Activos», `estandares/diseno-web.md` §7 |
 
 ## Origen
 

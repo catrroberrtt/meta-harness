@@ -1,5 +1,5 @@
 <!-- tipo: guia · capa: 4 -->
-<!-- revisado: 2026-10-08 · vence: 90d · fuente: lectura directa (sin ejecutar nada) del repositorio nexu-io/open-design, versión 0.23.1, commit 4263865 -->
+<!-- revisado: 2026-10-09 · vence: 90d · fuente: lectura directa (sin ejecutar nada) del repositorio nexu-io/open-design, versión 0.23.1, commit 4263865 -->
 
 # Análisis: open-design (nexu-io) para webs de empresa en el meta-harness
 
@@ -72,7 +72,7 @@ Leyenda de utilidad: **(a)** entorno de una empresa con estándar propio · **(b
 | CLI `od` + MCP para otros agentes | README «Use OpenDesign from your coding agent»; `apps/daemon` | media | alta | alta | EXT | Permite invocarlo sin interfaz y degradar si no está |
 | Contrato de sistema de diseño (manifiesto + `DESIGN.md` + `tokens.css`) | `design-systems/README.md`, `docs/design-systems.md`, `design-systems/_schema/` | alta | alta | alta | ADAP | Es la pieza que une ERP y web; la reescribimos como «ficha de marca + mapa de tokens» |
 | Estructura de 9 secciones del `DESIGN.md` | `design-systems/default/DESIGN.md`, `skills/design-brief/SKILL.md` | alta | alta | alta | ADAP | Estructura útil como lista de campos de la ficha de marca |
-| Catálogo de 154 sistemas «inspirados en marcas» | `design-systems/*` | baja | baja | media | DESC (como diseño) / referencia de **estructura** solamente | Riesgo de marca; no imitar identidades reales |
+| Catálogo de 154 sistemas «inspirados en marcas» | `design-systems/*` | baja | baja | media | DESC (**prohibido** desde 2026-10-09, ni como referencia a imitar; ver §11) | Riesgo de marca; no imitar identidades reales |
 | Sistemas neutros de arranque | `design-systems/default`, `warm-editorial`, `clean`, `minimal`… | baja | media | media | EXT (consultar) | Sirven de ejemplo de forma; los valores salen de la instancia |
 | Brief estructurado «I-Lang» | `skills/design-brief/SKILL.md` | media | alta | alta | ADAP | Idea: eliminar ambigüedad pidiendo paleta, tipografía, disposición, ánimo, densidad y exclusiones; nuestro brief va en `plantillas/web/brief-landing.md` |
 | Plantillas de landing/precios/espera/FAQ/docs/blog | `design-templates/saas-landing`, `pricing-page`, `waitlist-page`, `faq-page`, `docs-page`, `blog-post` | alta | alta | alta | ADAP | Se toma la lista de secciones y la regla «el acento aparece pocas veces»; el HTML no se copia |
@@ -113,3 +113,12 @@ Adaptación **conceptual**, con redacción propia, sin copiar texto ni archivos.
 ## 10. Texto del repositorio que parecía dirigirse a un agente
 
 Su `AGENTS.md` y `CLAUDE.md` (que solo contiene `@AGENTS.md`) empiezan con «Read this file first» y fijan reglas de contribución, comandos (`pnpm tools-dev`) y límites de directorios. Están escritos para los agentes que **desarrollan open-design**, no para este trabajo, y se **ignoraron**. No se halló ninguna otra orden dirigida a un agente fuera de sus propios prompts de producto y pruebas.
+
+## 11. Decisiones registradas (2026-10-09)
+
+Tomadas por la persona dueña del repositorio sobre lo analizado arriba; no cambian el análisis, cambian lo que el flujo permite.
+
+1. **Sistemas «inspirados en marcas reales» (Stripe, Apple, BMW…): prohibidos** en el flujo del adaptador `diseno-web`, ni siquiera como referencia a imitar. Solo se admiten sistemas de diseño propios de la empresa o genéricos sin marca. Aplicado en `adaptadores/diseno-web/README.md`, `estandares/diseno-web.md` §6 y en el verificador (`marca-ajena` sobre la ficha `DISENO.md`, con prueba). Reemplaza la lectura anterior de §5 y §7 que los dejaba como «referencia de estructura».
+2. **Telemetría de herramientas externas de diseño** (§4): solo dentro de un contenedor sin telemetría y con confirmación explícita de la persona; sin eso, modo manual. Aplicado en el adaptador (invocación, paso 2) y en el estándar §7.
+3. **Fuentes tipográficas remotas** (Google Fonts y similares, §5): se alojan en local; el verificador ya lo exige. Regla escrita en el adaptador («Activos») y en el estándar §7.
+4. **Ayuda del comando único**: el mapa «qué comando uso cuándo» va primero y las opciones técnicas después (`cli/README.md`); no está ligada a open-design pero se registró en la misma fecha.

@@ -156,6 +156,40 @@ class Sitio(unittest.TestCase):
             self.assertIn("relleno", codigos(e, "error"))
             self.assertTrue({"metrica-inventada", "emoji-icono"} <= set(codigos(e, "aviso")))
 
+    def ficha(self, d, texto):
+        r = sitio(d)
+        (r / "DISENO.md").write_text(texto, encoding="utf8")
+        return self.verificar(r)
+
+    def test_marca_ajena_como_referencia_es_error(self):
+        """Decisión 2026-10-09: ni sistemas «inspirados en» marcas reales ni marcas ajenas como referencia a imitar."""
+        casos = ["Sistema de diseño inspirado en Stripe, con morado y degradados.", "Tipografía y colores al estilo de Apple.",
+                 "Usar el sistema de diseño de BMW como base.", "Inspired by Linear: oscuro y minimalista.",
+                 "Queremos una web parecida a la de Nike."]
+        for texto in casos:
+            with tempfile.TemporaryDirectory() as d:
+                e = [h for h in self.ficha(d, "# Ficha\n" + texto + "\n") if h["codigo"] == "marca-ajena"]
+                self.assertEqual(len(e), 1, texto)
+                self.assertEqual((e[0]["nivel"], e[0]["linea"], e[0]["archivo"]), ("error", 2, "DISENO.md"), texto)
+
+    def test_marca_ajena_negada_o_solo_mencionada(self):
+        with tempfile.TemporaryDirectory() as d:
+            e = self.ficha(d, "- No hacer: imitar la identidad de otra empresa; prohibido copiar a Stripe.\n- Nunca al estilo de Apple.\n")
+            self.assertNotIn("marca-ajena", codigos(e)); self.assertNotIn("marca-ajena-mencion", codigos(e))
+        with tempfile.TemporaryDirectory() as d:
+            e = self.ficha(d, "Aceptamos pagos con Mastercard y envíos por Uber Eats.\n")
+            self.assertIn("marca-ajena-mencion", codigos(e, "aviso")); self.assertNotIn("marca-ajena", codigos(e))
+
+    def test_ficha_propia_no_da_hallazgos_de_marca(self):
+        with tempfile.TemporaryDirectory() as d:
+            e = self.ficha(d, "# Ficha de Ejemplo S. A.\nColor base #276eb1. Voz sobria y cercana. Sistema de diseño propio de la empresa.\n")
+            self.assertEqual([h for h in e if h["codigo"].startswith("marca-ajena")], [])
+
+    def test_solo_se_lee_la_ficha_declarada(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = sitio(d, extra="<p>Inspirado en Stripe</p>")
+            self.assertNotIn("marca-ajena", codigos(self.verificar(r)))
+
     def test_color_crudo_e_indigo(self):
         with tempfile.TemporaryDirectory() as d:
             e = self.verificar(sitio(d, estilo=ESTILO + ".b{background:#6366f1}"))

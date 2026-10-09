@@ -4,7 +4,8 @@
 Comprueba lo que se puede comprobar leyendo archivos: lang y title, jerarquía de encabezados, alt de imágenes,
 contraste WCAG de los pares de color de tokens.css (claro y oscuro), tamaños de fuente en px, peso de páginas y
 activos, enlaces y recursos internos rotos, secretos, recursos remotos y trackers no declarados, licencia de los
-activos y señales de texto de relleno. NO mide rendimiento real, ni lector de pantalla, ni teclado: ver
+activos, señales de texto de relleno y referencias a marcas ajenas en la ficha de marca declarada (DISENO.md; decisión
+2026-10-09: los sistemas «inspirados en marcas reales» no se usan ni como referencia). NO mide rendimiento real, ni lector de pantalla, ni teclado: ver
 estandares/diseno-web.md §5.
 
 Uso: python3 web-verificar-sitio.py <carpeta> [--json] [--estricto] [--permitidos archivo]
@@ -48,6 +49,18 @@ SECRETOS = [
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}")),
     ("asignación de secreto", re.compile(r"(?i)\b(?:api[_-]?key|secret|password|passwd|contrase[nñ]a|access[_-]?token)\b['\"]?\s*[:=]\s*['\"][^'\"\s]{8,}['\"]")),
 ]
+# Ficha de marca declarada (DISENO.md): un sistema de diseño «inspirado en» una marca real queda prohibido, incluso como referencia a imitar.
+MARCAS_AJENAS = ("Stripe", "Apple", "BMW", "Ferrari", "Nike", "Airbnb", "Spotify", "Starbucks", "Mastercard", "Tesla", "Vercel",
+                 "Shopify", "Uber", "Google", "Microsoft", "Amazon", "Netflix", "Adobe", "IBM", "Coinbase", "Revolut", "Porsche",
+                 "Lamborghini", "Mercedes", "Audi", "Ikea", "Pinterest", "Supabase", "Framer", "Webflow", "Cloudflare", "Zapier",
+                 "Airtable", "Dropbox", "PayPal", "Samsung", "Sony", "Nvidia", "Figma", "Slack", "Intercom", "Mintlify", "Raycast")
+RX_MARCA = re.compile(r"(?<![\w-])(" + "|".join(re.escape(m) for m in MARCAS_AJENAS) + r")(?![\w-])")
+RX_IMITACION = re.compile(r"inspirad[oa]s?\s+en|inspired\s+by|al\s+estilo\s+de|in\s+the\s+style\s+of|estilo\s+de|style\s+of|"
+                          r"similar\s+a|parecid[oa]s?\s+a|como\s+(?:el|la|los|las)\b|clon\s+de|copia\s+de|imitar?|igual\s+que|"
+                          r"basad[oa]s?\s+en|like\b|based\s+on|referencia|dise[ñn]o\s+de|design\s+system\s+(?:of|from)|como\s+base", re.I)
+RX_INSPIRADO_EN = re.compile(r"(?i:inspirad[oa]s?\s+en|inspired\s+by|al\s+estilo\s+de|in\s+the\s+style\s+of|clon\s+de|copia\s+de)\s+"
+                             r"(?i:la\s+marca\s+|el\s+sitio\s+de\s+|la\s+web\s+de\s+)?([A-Z][\w.&-]+)")
+RX_NEGACION = re.compile(r"\b(?:no|nunca|sin|jam[aá]s|evitar?|prohibid[oa]s?|never|don'?t|avoid)\b", re.I)
 PARES_DEFECTO = [("--text", "--bg", 4.5), ("--text", "--surface", 4.5), ("--muted", "--bg", 4.5),
                  ("--muted", "--surface", 4.5), ("--on-brand", "--brand-600", 4.5), ("--brand-600", "--bg", 4.5),
                  ("--focus-ring", "--bg", 3.0)] + [(f"--tone-{t}-fg", f"--tone-{t}-bg", 4.5) for t in ("ok", "warn", "danger", "info")]
@@ -468,6 +481,29 @@ def comprobar_secretos(raiz):
     return res
 
 
+def comprobar_marca_ajena(raiz):
+    """En la ficha de marca declarada (DISENO.md): marcas reales usadas como referencia a imitar (error) o solo mencionadas (aviso).
+    Las líneas que lo niegan («no imitar a …», «prohibido …») no cuentan. Es una búsqueda de texto: no sustituye la revisión humana (punto 16)."""
+    res = []
+    for f in sorted(raiz.rglob("*")):
+        if not f.is_file() or f.name.lower() != "diseno.md": continue
+        rel = f.relative_to(raiz)
+        for n, linea in enumerate(f.read_text(encoding="utf8", errors="ignore").splitlines(), 1):
+            inspirada = RX_INSPIRADO_EN.search(linea)
+            marcas = list(RX_MARCA.finditer(linea))
+            pos = inspirada.start() if inspirada else (marcas[0].start() if marcas else None)
+            if pos is None: continue
+            if RX_NEGACION.search(linea[:pos]): continue   # «no imitar a …», «prohibido …»: la línea lo niega
+            nombres = ", ".join(sorted({m.group(1) for m in marcas}))
+            if inspirada:
+                res.append(hallazgo(ERROR, "marca-ajena", rel, f"sistema de diseño «inspirado en» otra marca ({inspirada.group(1)}): prohibido, ni como referencia (ficha propia o genérica sin marca)", n))
+            elif RX_IMITACION.search(linea):
+                res.append(hallazgo(ERROR, "marca-ajena", rel, f"marca ajena como referencia a imitar ({nombres}): prohibido, ni como referencia (ficha propia o genérica sin marca)", n))
+            else:
+                res.append(hallazgo(AVISO, "marca-ajena-mencion", rel, f"menciona marca(s) ajena(s) ({nombres}): confirmar que no son referencia de diseño", n))
+    return res
+
+
 def comprobar_licencias(raiz):
     res, lic = [], raiz / "activos" / "LICENCIAS.md"
     activos = [f for f in sorted(raiz.rglob("*")) if f.is_file() and f.suffix.lower() in EXT_MEDIA]
@@ -504,7 +540,7 @@ def verificar(raiz, permitidos_ruta=None, limites=None):
         for t in tokens: res += comprobar_contraste(t.read_text(encoding="utf8", errors="replace"), t.relative_to(raiz))
     else:
         res.append(hallazgo(AVISO, "contraste-sin-tokens", ".", "no hay tokens.css: contraste de color no comprobado"))
-    res += comprobar_secretos(raiz) + comprobar_licencias(raiz) + comprobar_pesos_activos(raiz, lim)
+    res += comprobar_secretos(raiz) + comprobar_licencias(raiz) + comprobar_pesos_activos(raiz, lim) + comprobar_marca_ajena(raiz)
     return res
 
 

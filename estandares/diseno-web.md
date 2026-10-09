@@ -1,7 +1,7 @@
 # Estándar de diseño web (landing, sitio corporativo, página de producto)
 
 <!-- tipo: estándar técnico · capa: 2 -->
-<!-- revisado: 2026-10-08 · vence: 90d · fuente: docs/ANALISIS-OPEN-DESIGN.md y la herramienta herramientas/web-verificar-sitio.py, con sus pruebas -->
+<!-- revisado: 2026-10-09 · vence: 90d · fuente: docs/ANALISIS-OPEN-DESIGN.md y la herramienta herramientas/web-verificar-sitio.py, con sus pruebas -->
 
 Reglas para cualquier web pública de una empresa, sea el sitio de un cliente del ERP o de un proyecto nuevo. Independiente de la herramienta que genere el borrador (ver `adaptadores/diseno-web/`). Lo medible lo mide `herramientas/web-verificar-sitio.py`; lo demás es lectura humana y queda anotado.
 
@@ -55,7 +55,7 @@ Objetivo de trabajo: **WCAG 2.2 AA**. Cubre lo que hoy piden las referencias hab
 
 `python3 herramientas/web-verificar-sitio.py <carpeta> [--json]` (Python estándar, sin red, sin navegador):
 
-**Sí comprueba:** `lang` y `title`; una `h1` y jerarquía de encabezados; `alt` en imágenes; contraste WCAG de los pares de color de `tokens.css` en tema claro y oscuro (pares por defecto y los declarados con `/* contraste: --a sobre --b >= 4.5 */`); tamaños de fuente en `px`; peso de páginas y activos contra un presupuesto; enlaces y recursos internos rotos; secretos con forma conocida; dominios remotos (scripts, hojas de estilo, fuentes, imágenes, iframes) no declarados en `sitio.permitidos.txt`; trackers conocidos; activos sin línea en `activos/LICENCIAS.md`; relleno (texto de relleno, índigo por defecto, imágenes de marcadores externos, emojis como iconos, métricas del tipo «10× más rápido»); hex crudos fuera de `:root`.
+**Sí comprueba:** `lang` y `title`; una `h1` y jerarquía de encabezados; `alt` en imágenes; contraste WCAG de los pares de color de `tokens.css` en tema claro y oscuro (pares por defecto y los declarados con `/* contraste: --a sobre --b >= 4.5 */`); tamaños de fuente en `px`; peso de páginas y activos contra un presupuesto; enlaces y recursos internos rotos; secretos con forma conocida; dominios remotos (scripts, hojas de estilo, fuentes, imágenes, iframes) no declarados en `sitio.permitidos.txt`; trackers conocidos; activos sin línea en `activos/LICENCIAS.md`; marcas ajenas en la ficha de marca declarada (`DISENO.md`: «inspirado en», «al estilo de»… es error `marca-ajena`; una mención suelta es aviso); relleno (texto de relleno, índigo por defecto, imágenes de marcadores externos, emojis como iconos, métricas del tipo «10× más rápido»); hex crudos fuera de `:root`.
 
 **No comprueba (se hace a mano y se anota):** rendimiento real (LCP, CLS, red lenta); lector de pantalla; navegación con teclado de punta a punta; contraste de texto sobre imágenes o degradados; contraste de pares que no estén en `tokens.css`; calidad y veracidad del texto; que las afirmaciones comerciales correspondan a módulos instalados; textos legales; que la marca no imite otra; compatibilidad de navegadores; validez completa de HTML. El verificador **no es una auditoría de accesibilidad**: un código 0 significa «no se halló lo que sabemos buscar».
 
@@ -63,7 +63,7 @@ Presupuesto por defecto (ajustable con opciones): HTML ≤ 150 KB, CSS ≤ 100 K
 
 ## 6. Sistemas de diseño «inspirados en marcas», activos y licencias
 
-- Herramientas como open-design traen decenas de sistemas «inspirados en» empresas reales. Sirven como **referencia de estructura** (qué campos tiene un buen sistema), **no como diseño a imitar**: usar los colores, tipografías y rasgos distintivos de una marca ajena para la web de otra empresa invita a la confusión y a reclamos de marca registrada. Las tipografías comerciales que esos sistemas nombran no vienen incluidas y requieren licencia propia.
+- **Decisión 2026-10-09: los sistemas de diseño «inspirados en marcas reales» (Stripe, Apple, BMW…) están prohibidos** en el flujo de diseño web, ni siquiera como referencia a imitar. Herramientas como open-design traen decenas; usar los colores, tipografías y rasgos distintivos de una marca ajena para la web de otra empresa invita a la confusión y a reclamos de marca registrada. **Solo se admiten sistemas de diseño propios de la empresa (su ficha de marca) o genéricos sin marca.** El verificador marca como error una ficha `DISENO.md` que se declare inspirada en una marca real; el punto 16 de revisión a mano sigue en pie. Las tipografías comerciales que esos sistemas nombran no vienen incluidas y requieren licencia propia.
 - No se reutiliza el contenido de skills «de catálogo» sin leer la licencia del repositorio de origen (la de la herramienta no la reemplaza).
 - Prohibido clonar sitios ajenos o extraer la marca de una URL de terceros.
 - Todo activo declara origen, autoría y licencia en `activos/LICENCIAS.md`. Fuentes e imágenes se sirven desde el propio sitio; sin licencia clara no entra.
@@ -72,8 +72,9 @@ Presupuesto por defecto (ajustable con opciones): HTML ≤ 150 KB, CSS ≤ 100 K
 ## 7. Privacidad
 
 - Ningún recurso remoto sin declarar: ni fuentes de Google, ni analítica, ni mapas, ni vídeo incrustado que fije cookies. Lo remoto permitido se escribe en `sitio.permitidos.txt` con el motivo.
+- **Decisión 2026-10-09: las fuentes tipográficas remotas (Google Fonts y similares) se alojan en local**, dentro de `sitio/activos/` con su licencia; el verificador ya marca como error el recurso remoto no declarado.
 - Formularios: decir qué datos se piden, para qué y a quién llegan; sin credenciales en el código de la página.
-- Antes de usar una herramienta de generación, decir a la persona qué envía y a quién (modelos, telemetría). Sin su confirmación no se usa.
+- Antes de usar una herramienta de generación, decir a la persona qué envía y a quién (modelos, telemetría). **Decisión 2026-10-09: una herramienta externa de diseño solo se ejecuta dentro de un contenedor sin telemetría y con confirmación explícita de la persona; sin ambas cosas, modo manual.**
 
 ## 8. Contenido
 

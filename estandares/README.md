@@ -8,3 +8,7 @@ Arquitectura por capas y escalas S/M/L, paradigmas de codificación, criterios a
 ## Origen
 
 Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia (parametrizacion).
+
+<!-- open-design:inicio -->
+Estándar adicional: `diseno-web.md` (webs públicas: marca y tokens compartidos con el ERP, accesibilidad, privacidad, activos y licencias).
+<!-- open-design:fin -->

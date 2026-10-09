@@ -49,3 +49,9 @@ Cada cambio recorre la misma cadena (propuesta, análisis, especificación, dele
 ## Estado
 
 Esqueleto (0.1.x): estructura, contratos de adaptadores, plantilla de convenciones, `adopt` funcional y dos herramientas genéricas. El resto de documentos llega a cada carpeta solo cuando supera la medición (tipo declarado y especificidad 0).
+
+<!-- open-design:inicio -->
+## Webs de empresa (landing, sitio corporativo)
+
+Adaptador `adaptadores/diseno-web/` (herramienta de generación **opcional y externa**, con modo manual), estándar `estandares/diseno-web.md`, plantillas `plantillas/web/` y verificador `herramientas/web-verificar-sitio.py`. Análisis de la herramienta externa estudiada: `docs/ANALISIS-OPEN-DESIGN.md`.
+<!-- open-design:fin -->

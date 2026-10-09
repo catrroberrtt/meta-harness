@@ -18,3 +18,10 @@ Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia 
 Una instancia aporta su propio `patrones-proyecto.txt` (una regex por línea, `#` para comentarios) en la raíz que se analiza.
 Alternativamente se define la variable de entorno `HARNESS_PATRON_PROYECTO`; sin ninguno se usa el patrón genérico.
 El harness nunca guarda esos patrones: pertenecen a la instancia.
+
+<!-- open-design:inicio -->
+## Webs (adaptador `diseno-web`)
+
+- `web-verificar-sitio.py <carpeta> [--json] [--estricto]`: verificador estático de un sitio generado (lang, title, encabezados, alt, contraste de tokens, px en fuentes, pesos, enlaces rotos, secretos, remotos y trackers no declarados, licencias de activos, relleno). Sin red ni navegador; lo que no comprueba está en `estandares/diseno-web.md` §5.
+- `web-detectar-herramienta.py [--json]`: dice si hay una herramienta externa de generación (sin ejecutarla); si no, el adaptador usa el modo manual.
+<!-- open-design:fin -->

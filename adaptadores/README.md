@@ -8,3 +8,7 @@ Un adaptador conecta el método con una herramienta externa de **tickets** o de 
 ## Origen
 
 Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia (parametrizacion).
+
+<!-- open-design:inicio -->
+Adaptador adicional: `diseno-web` (sitios web públicos de una empresa; herramienta de generación externa opcional, con modo manual y puntos de control verificables).
+<!-- open-design:fin -->

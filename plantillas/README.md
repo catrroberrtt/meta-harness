@@ -18,3 +18,7 @@ Cada plantilla lleva en su cabecera `tipo` y `revisado/vence/fuente` (ver `metod
 ## Origen
 
 Los formatos salen de una instancia de origen; el mapa formato → plantilla vive en la instancia.
+
+<!-- open-design:inicio -->
+Webs: carpeta `web/` (brief de landing, ficha de marca, mapa de tokens ERP-web-documentos y tokens de ejemplo).
+<!-- open-design:fin -->

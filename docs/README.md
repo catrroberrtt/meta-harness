@@ -19,3 +19,9 @@ Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia 
 - `MAPA-DE-COMANDOS.md`: qué comando uso cuándo (empresa con estándar propio, entorno centralizado, proyecto nuevo).
 - `../metodo/terminado-y-trazabilidad.md`: la cadena de punta a punta, la matriz de trazabilidad y la lista de cierre.
 - `ANALISIS-CLAUDE-SKILLS.md`: qué se rescató y qué no de un catálogo público de skills, con atribución.
+
+<!-- open-design:inicio -->
+## Webs de empresa
+
+- `ANALISIS-OPEN-DESIGN.md`: análisis honesto de open-design (nexu-io): qué es, licencias y marcas, privacidad, qué se usa como herramienta externa y qué se adapta.
+<!-- open-design:fin -->

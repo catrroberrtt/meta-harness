@@ -35,7 +35,7 @@ El ERP define sus tokens en `frontend/src/styles/_tokens.scss` (escala de marca 
 | Solo web | — | `--on-brand`, `--max-w`, `--section-gap`, `--text-sm…--text-4xl` | No existen en el ERP |
 | Solo ERP | `--tb-*`, `--sb-*`, `--tile-*`, `--row-h`, `--sb-w` | (no se llevan) | Pertenecen al marco de la aplicación |
 
-Tema oscuro: se declara bajo `:root[data-theme='dark']` **y** bajo `@media (prefers-color-scheme: dark)` para `:root:not([data-theme='light'])`, con los mismos nombres. Los componentes de la web **solo leen variables**: un color escrito fuera de `:root` es un defecto (sección 5, punto «hex crudos»).
+Tema oscuro: se declara bajo `:root[data-theme='dark']` **y** bajo `@media (prefers-color-scheme: dark)` para `:root:not([data-theme='light'])`, con los mismos nombres. Los componentes de la web **solo leen variables**: un color escrito fuera de `:root` es un defecto que el verificador avisa (sección 5, «hex crudos fuera de `:root`»).
 
 ## 4. Accesibilidad: el piso de trabajo
 

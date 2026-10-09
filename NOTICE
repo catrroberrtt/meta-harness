@@ -3,3 +3,19 @@ Copyright 2026 Cristofer Alfaro
 
 Este producto incluye software desarrollado por Cristofer Alfaro (https://github.com/catrroberrtt).
 Licenciado bajo la Apache License, Version 2.0 (ver LICENSE).
+
+Ideas adaptadas de terceros (sin copiar texto ni código)
+--------------------------------------------------------
+Algunas ideas de método de metodo/terminado-y-trazabilidad.md y de las plantillas
+asociadas se reescribieron a partir de la lectura de Jeffallan/claude-skills
+(https://github.com/Jeffallan/claude-skills, licencia MIT). Detalle, rutas de origen
+y decisiones en docs/ANALISIS-CLAUDE-SKILLS.md (sección 6):
+  - requisitos con disparador y criterios Dado/Cuando/Entonces
+    (skills/feature-forge/references/, skills/spec-miner/references/ears-format.md);
+  - suposiciones con nivel de confianza (commands/common-ground/, docs/COMMON_GROUND.md);
+  - desafío previo o pre-mortem (skills/the-fool/);
+  - revisión en dos etapas (skills/code-reviewer/references/spec-compliance-review.md,
+    que a su vez declara derivar de obra/superpowers, licencia MIT);
+  - contrato declarativo por etapa (commands/workflow-manifest.yaml);
+  - plantilla de decisión de arquitectura (skills/architecture-designer/references/adr-template.md);
+  - prueba vista fallar antes de pasar (skills/test-master/references/tdd-iron-laws.md).

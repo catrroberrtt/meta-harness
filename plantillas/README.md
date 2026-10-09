@@ -10,6 +10,7 @@ Una plantilla por formato generalizable. Variables `{{…}}`; los campos marcado
 | Tickets | `ticket-hallazgo.md` · `ticket-cierre.md` · `ticket-jerarquia.md` · `apertura-de-cambio.md` |
 | Documentación | `doc-pagina.md` · `doc-hoja-padre.md` · `doc-modelo-y-migraciones.md` · `doc-contrato-api.md` · `casos-de-prueba.md` · `preguntas-abiertas.md` · `conocimiento-modulo.md` · `convergencia.md` · `descripcion-cambio.md` · `estado-del-tema.md` |
 | Planificación | `intake.md` · `mapa-reutilizacion.md` · `plan.md` · `manifiesto.md` |
+| Trazabilidad (`metodo/terminado-y-trazabilidad.md`) | `especificacion.md` · `matriz-trazabilidad.md` · `delegacion.md` · `cierre-de-cambio.md` · `decision-de-arquitectura.md` · ejemplo ejecutable en `ejemplos/cambio-ejemplo/` |
 | Verificación y calidad | `evidencia-datos.md` · `informe-revisor.md` · `hallazgo-validado.md` · `mapeo-diseno.md` · `qa-contexto.md` · `qa-revision.md` · `mapa-cobertura.md` · `patron-calidad.md` · `registro-correcciones.md` |
 
 Cada plantilla lleva en su cabecera `tipo` y `revisado/vence/fuente` (ver `metodo/frescura.md`). La forma de usarlas está en `metodo/forma-de-trabajo.md`.

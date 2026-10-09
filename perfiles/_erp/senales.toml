@@ -1,0 +1,615 @@
+# Señales del negocio -> módulos del ERP. Datos EDITABLES, sin código y sin modelo de lenguaje.
+# Cómo se lee (docs/OPCION-ERP.md): cada término cuenta `peso` puntos por archivo, hasta `max_por_termino_y_archivo`
+# coincidencias del mismo término en el mismo archivo; los puntos de una señal se suman entre archivos. Si la suma llega al
+# umbral, los módulos de la señal entran a la propuesta con su evidencia (archivo, línea, fragmento).
+# Los términos van en minúsculas y SIN tildes (la lectura también quita las tildes del texto). Se busca palabra completa
+# y se admite plural simple («proveedor» encuentra «proveedores»). Peso: 3 = específico del módulo, 2 = habitual, 1 = genérico.
+# Los ids de módulo son los de modulos/catalogo.json del ERP; un id que no exista en el catálogo leído se avisa y se ignora.
+# Sin señal a propósito: `suministros` (reporte para la industria de suministros), demasiado ambiguo como palabra clave.
+# Sin datos de ninguna empresa: son palabras del oficio, no nombres propios.
+
+version = 1
+
+[umbrales]
+senal = 3
+rubro = 5
+max_por_termino_y_archivo = 3
+evidencia_max = 3
+fragmento_max = 140
+
+# ---------------------------------------------------------------- rubros (eligen el producto de partida del catálogo)
+[rubro.comercio]
+etiqueta = "Comercio (tiendas, mayoristas, minoristas)"
+producto = "comercio"
+perfil = "comercio"
+terminos = [["retail", 3], ["minorista", 3], ["mayorista", 3], ["punto de venta", 3], ["tienda", 2], ["supermercado", 3],
+            ["minimarket", 3], ["ferreteria", 3], ["boutique", 3], ["botica", 3], ["farmacia", 2], ["comercio", 2],
+            ["venta de productos", 3], ["catalogo de productos", 2]]
+
+[rubro.distribucion]
+etiqueta = "Distribución y logística"
+producto = "distribucion"
+perfil = "distribucion"
+terminos = [["distribuidora", 3], ["distribucion", 2], ["reparto", 3], ["operador logistico", 3], ["flota", 2],
+            ["transporte de carga", 3], ["logistica", 2], ["ruta de reparto", 3], ["last mile", 3]]
+
+[rubro.industrial]
+etiqueta = "Industrial (fabricación)"
+producto = "industrial"
+perfil = "industrial"
+terminos = [["fabrica", 3], ["planta industrial", 3], ["manufactura", 3], ["materia prima", 3], ["producto terminado", 3],
+            ["produccion", 2], ["industria", 2], ["maquinaria", 2], ["planta de produccion", 3], ["linea de produccion", 3]]
+
+[rubro.servicios]
+etiqueta = "Servicios y proyectos"
+producto = "servicios"
+perfil = "servicios"
+terminos = [["consultoria", 3], ["servicios profesionales", 3], ["horas facturables", 3], ["asesoria", 2],
+            ["contrato de servicios", 2], ["proyectos", 1], ["consultores", 2], ["estudio de arquitectura", 3]]
+
+[rubro.inmobiliario]
+etiqueta = "Inmobiliario"
+producto = "inmobiliario"
+perfil = "inmobiliario"
+terminos = [["inmobiliaria", 3], ["bienes raices", 3], ["arrendamiento", 3], ["alquiler", 2], ["inquilino", 3],
+            ["arrendatario", 3], ["inmueble", 2], ["departamentos", 2], ["condominio", 2], ["edificio", 1]]
+
+[rubro.financiero]
+etiqueta = "Entidad financiera"
+producto = "financiero"
+perfil = "financiero"
+terminos = [["entidad financiera", 3], ["cooperativa de ahorro", 3], ["caja municipal", 3], ["microfinanzas", 3],
+            ["prestamos", 2], ["ahorros", 2], ["banca", 2], ["cartera de creditos", 3]]
+
+[rubro.sector-publico]
+etiqueta = "Sector público"
+producto = "sector-publico"
+perfil = "sector-publico"
+terminos = [["entidad publica", 3], ["sector publico", 3], ["municipalidad", 3], ["gobierno regional", 3], ["siaf", 3],
+            ["seace", 3], ["contrataciones del estado", 3]]
+
+[rubro.contable]
+etiqueta = "Contable (estudio o área contable)"
+producto = "contable"
+perfil = "contable"
+terminos = [["estudio contable", 3], ["libros contables", 3], ["asesoria tributaria", 3], ["contabilidad", 2], ["contador", 2],
+            ["declaraciones juradas", 2]]
+
+[rubro.almacen]
+etiqueta = "Almacén (operación de inventarios)"
+producto = "almacen"
+perfil = "almacen"
+terminos = [["almacen", 3], ["kardex", 3], ["inventario", 2], ["stock", 2], ["existencias", 2], ["bodega", 2]]
+
+[rubro.recursos-humanos]
+etiqueta = "Recursos humanos"
+producto = "recursos-humanos"
+perfil = "recursos-humanos"
+terminos = [["recursos humanos", 3], ["rrhh", 3], ["planilla", 2], ["reclutamiento", 2], ["gestion del talento", 3]]
+
+# ---------------------------------------------------------------- señales por proceso (eligen módulos)
+# --- logística
+[senal.almacen]
+etiqueta = "Almacén e inventario"
+modulos = ["almacen"]
+terminos = [["almacen", 3], ["inventario", 2], ["stock", 2], ["existencias", 2], ["kardex", 3], ["mercaderia", 2],
+            ["bodega", 2], ["guia de remision", 2], ["entrada de mercaderia", 3], ["salida de mercaderia", 3]]
+
+[senal.almacen-avanzado]
+etiqueta = "Almacén avanzado (ubicaciones, picking)"
+modulos = ["almacen-avanzado"]
+terminos = [["picking", 3], ["ubicaciones de almacen", 3], ["wms", 3], ["zonas de almacenamiento", 3], ["reabastecimiento", 2],
+            ["putaway", 3]]
+
+[senal.inventario-fisico]
+etiqueta = "Inventario físico"
+modulos = ["inventario-fisico"]
+terminos = [["inventario fisico", 3], ["conteo ciclico", 3], ["toma de inventario", 3], ["conteo de inventario", 3]]
+
+[senal.lotes-series]
+etiqueta = "Lotes y series"
+modulos = ["lotes-series"]
+terminos = [["numero de lote", 3], ["lotes y series", 3], ["numero de serie", 3], ["fecha de vencimiento", 2],
+            ["trazabilidad de lotes", 3], ["series de productos", 2]]
+
+[senal.expedicion]
+etiqueta = "Expedición y despacho"
+modulos = ["expedicion"]
+terminos = [["despacho", 2], ["expedicion", 3], ["guia de despacho", 3], ["entrega a clientes", 2], ["despachos", 2]]
+
+[senal.transporte]
+etiqueta = "Transporte y flota"
+modulos = ["transporte"]
+terminos = [["flota", 2], ["transporte", 2], ["ruta de reparto", 3], ["reparto", 2], ["conductores", 2],
+            ["guia de transportista", 3], ["vehiculos", 1], ["transportista", 2]]
+
+[senal.patios]
+etiqueta = "Patios y muelles"
+modulos = ["patios"]
+terminos = [["muelle", 2], ["patio de maniobras", 3], ["citas de descarga", 3], ["andenes", 2]]
+
+[senal.comercio-exterior]
+etiqueta = "Comercio exterior y aduanas"
+modulos = ["comercio-exterior"]
+terminos = [["aduana", 3], ["aduanas", 3], ["arancel", 3], ["incoterm", 3], ["importaciones", 2], ["exportaciones", 2],
+            ["comercio exterior", 3], ["dua", 2]]
+
+# --- compras
+[senal.compras]
+etiqueta = "Compras y abastecimiento"
+modulos = ["compras"]
+terminos = [["orden de compra", 3], ["solicitud de compra", 3], ["compras", 1], ["proveedor", 1], ["abastecimiento", 2],
+            ["adquisiciones", 2], ["cotizacion de proveedor", 3], ["requerimiento de compra", 3], ["pedido a proveedor", 3]]
+
+[senal.verificacion-facturas]
+etiqueta = "Verificación de facturas de proveedor"
+modulos = ["verificacion-facturas"]
+terminos = [["factura de proveedor", 3], ["facturas de proveedores", 3], ["tres vias", 3], ["conciliar facturas", 3],
+            ["registro de facturas de compra", 3]]
+
+[senal.gestion-proveedores]
+etiqueta = "Gestión de proveedores"
+modulos = ["gestion-proveedores"]
+terminos = [["evaluacion de proveedores", 3], ["homologacion de proveedores", 3], ["calificacion de proveedores", 3],
+            ["desempeno de proveedores", 3]]
+
+[senal.compras-servicios]
+etiqueta = "Compra de servicios"
+modulos = ["compras-servicios"]
+terminos = [["contratacion de servicios", 3], ["compra de servicios", 3], ["orden de servicio", 3], ["servicios de terceros", 2]]
+
+[senal.portal-proveedores]
+etiqueta = "Portal de proveedores"
+modulos = ["portal-proveedores"]
+terminos = [["portal de proveedores", 3], ["portal para proveedores", 3], ["proveedores ingresan", 2]]
+
+# --- ventas
+[senal.ventas]
+etiqueta = "Ventas y distribución comercial"
+modulos = ["ventas"]
+terminos = [["pedido de venta", 3], ["pedidos de venta", 3], ["ventas", 1], ["cotizacion a cliente", 3], ["cotizaciones a clientes", 3],
+            ["cliente", 1], ["pedidos", 1], ["vendedores", 2], ["proceso comercial", 2], ["facturacion de ventas", 3]]
+
+[senal.precios-condiciones]
+etiqueta = "Precios y condiciones"
+modulos = ["precios-condiciones"]
+terminos = [["lista de precios", 3], ["listas de precios", 3], ["condiciones comerciales", 3], ["tarifario", 2],
+            ["precio especial", 3], ["descuentos por volumen", 3], ["descuento", 1]]
+
+[senal.agencias]
+etiqueta = "Agencias y red de agentes"
+modulos = ["agencias"]
+terminos = [["red de agentes", 3], ["agentes comerciales", 3], ["agencias", 2], ["agente comercial", 3]]
+
+[senal.crm]
+etiqueta = "Relación con clientes (CRM)"
+modulos = ["crm"]
+terminos = [["crm", 3], ["prospecto", 2], ["oportunidades de venta", 3], ["seguimiento comercial", 3], ["leads", 3],
+            ["embudo de ventas", 3]]
+
+[senal.comercio-electronico]
+etiqueta = "Comercio electrónico"
+modulos = ["comercio-electronico"]
+terminos = [["tienda virtual", 3], ["ecommerce", 3], ["e-commerce", 3], ["comercio electronico", 3], ["tienda online", 3],
+            ["tienda en linea", 3], ["carrito de compras", 3], ["venta por internet", 3]]
+
+[senal.comisiones]
+etiqueta = "Comisiones"
+modulos = ["comisiones"]
+terminos = [["comision de ventas", 3], ["comisiones", 2], ["esquema de comisiones", 3], ["liquidacion de comisiones", 3]]
+
+[senal.servicio-cliente]
+etiqueta = "Servicio al cliente y postventa"
+modulos = ["servicio-cliente"]
+terminos = [["postventa", 3], ["post venta", 3], ["servicio tecnico", 3], ["garantia", 2], ["reclamos de clientes", 3],
+            ["tickets de soporte", 3], ["mesa de ayuda", 3]]
+
+# --- producción, calidad y mantenimiento
+[senal.produccion]
+etiqueta = "Producción"
+modulos = ["produccion"]
+terminos = [["orden de produccion", 3], ["lista de materiales", 3], ["manufactura", 3], ["ensamblaje", 2], ["produccion", 2],
+            ["fabrica", 2], ["materia prima", 3], ["producto terminado", 3], ["linea de produccion", 3], ["maquila", 3]]
+
+[senal.planificacion-necesidades]
+etiqueta = "Planificación de necesidades (MRP)"
+modulos = ["planificacion-necesidades"]
+terminos = [["mrp", 3], ["planificacion de necesidades", 3], ["plan de materiales", 3], ["necesidades de materiales", 3]]
+
+[senal.produccion-proceso]
+etiqueta = "Producción por procesos (fórmulas)"
+modulos = ["produccion-proceso"]
+terminos = [["formulacion", 3], ["recetas de produccion", 3], ["formulas de produccion", 3], ["industria de procesos", 3]]
+
+[senal.produccion-repetitiva]
+etiqueta = "Producción repetitiva y kanban"
+modulos = ["produccion-repetitiva"]
+terminos = [["kanban", 3], ["linea de ensamblaje", 3], ["produccion en serie", 3], ["produccion repetitiva", 3]]
+
+[senal.planificacion-ventas-operaciones]
+etiqueta = "Planificación de ventas y operaciones"
+modulos = ["planificacion-ventas-operaciones"]
+terminos = [["pronostico de demanda", 3], ["plan de demanda", 3], ["planificacion de la demanda", 3], ["s&op", 3]]
+
+[senal.variantes]
+etiqueta = "Variantes de producto"
+modulos = ["variantes"]
+terminos = [["variantes de producto", 3], ["tallas y colores", 3], ["configurador de producto", 3], ["productos configurables", 3]]
+
+[senal.calidad]
+etiqueta = "Gestión de calidad"
+modulos = ["calidad"]
+terminos = [["control de calidad", 3], ["no conformidad", 3], ["no conformidades", 3], ["inspeccion", 2], ["calidad", 1],
+            ["iso 9001", 3], ["certificado de calidad", 3]]
+
+[senal.mantenimiento]
+etiqueta = "Mantenimiento de planta"
+modulos = ["mantenimiento"]
+terminos = [["mantenimiento preventivo", 3], ["mantenimiento correctivo", 3], ["mantenimiento de equipos", 3],
+            ["orden de mantenimiento", 3], ["mantenimiento de maquinaria", 3]]
+
+# --- finanzas
+[senal.contabilidad]
+etiqueta = "Contabilidad financiera"
+modulos = ["contabilidad"]
+terminos = [["contabilidad", 3], ["asientos contables", 3], ["plan de cuentas", 3], ["libro diario", 3], ["libro mayor", 3],
+            ["estados financieros", 3], ["contador", 2], ["pcge", 3], ["balance general", 3]]
+
+[senal.comprobantes]
+etiqueta = "Comprobantes electrónicos"
+modulos = ["comprobantes"]
+terminos = [["factura electronica", 3], ["facturacion electronica", 3], ["boleta de venta", 3], ["comprobante electronico", 3],
+            ["sunat", 2], ["nota de credito", 2], ["comprobantes de pago", 3], ["emision de comprobantes", 3]]
+
+[senal.impuestos-peru]
+etiqueta = "Impuestos y libros legales (Perú)"
+modulos = ["impuestos-peru"]
+terminos = [["igv", 3], ["registro de compras", 3], ["registro de ventas", 3], ["libros electronicos", 3], ["pdt 621", 3],
+            ["detracciones", 3], ["detraccion", 3], ["declaracion mensual", 2], ["renta anual", 2], ["percepciones", 2]]
+
+[senal.cuentas-por-pagar]
+etiqueta = "Cuentas por pagar"
+modulos = ["cuentas-por-pagar"]
+terminos = [["cuentas por pagar", 3], ["pago a proveedores", 3], ["pagos a proveedores", 3], ["programacion de pagos", 3],
+            ["cronograma de pagos", 2], ["deuda con proveedores", 3]]
+
+[senal.cuentas-por-cobrar]
+etiqueta = "Cuentas por cobrar"
+modulos = ["cuentas-por-cobrar"]
+terminos = [["cuentas por cobrar", 3], ["cobranza", 2], ["cobranzas", 2], ["cartera de clientes", 2], ["morosidad", 2],
+            ["facturas pendientes de cobro", 3], ["cobro a clientes", 3]]
+
+[senal.credito-cobranzas]
+etiqueta = "Crédito y cobranzas"
+modulos = ["credito-cobranzas"]
+terminos = [["limite de credito", 3], ["linea de credito del cliente", 3], ["gestion de cobranza", 3], ["antiguedad de saldos", 3],
+            ["credito a clientes", 3]]
+
+[senal.disputas]
+etiqueta = "Disputas de facturas"
+modulos = ["disputas"]
+terminos = [["disputa de factura", 3], ["disputas de facturas", 3], ["reclamo de factura", 3], ["facturas en disputa", 3]]
+
+[senal.bancos]
+etiqueta = "Bancos y conciliación"
+modulos = ["bancos"]
+terminos = [["conciliacion bancaria", 3], ["extractos bancarios", 3], ["estado de cuenta bancario", 3], ["cuentas bancarias", 2],
+            ["banco", 1], ["bancos", 1], ["transferencias", 1]]
+
+[senal.tesoreria]
+etiqueta = "Tesorería y liquidez"
+modulos = ["tesoreria"]
+terminos = [["tesoreria", 3], ["flujo de caja", 3], ["liquidez", 2], ["proyeccion de caja", 3], ["posicion de caja", 3]]
+
+[senal.activos-fijos]
+etiqueta = "Activos fijos"
+modulos = ["activos-fijos"]
+terminos = [["activos fijos", 3], ["activo fijo", 3], ["depreciacion", 3], ["inmovilizado", 2], ["maquinaria y equipo", 2]]
+
+[senal.costos]
+etiqueta = "Control de costos"
+modulos = ["costos"]
+terminos = [["centro de costo", 3], ["centros de costo", 3], ["costos", 2], ["costeo", 2], ["control de costos", 3], ["margen", 1]]
+
+[senal.costeo-producto]
+etiqueta = "Costeo de producto"
+modulos = ["costeo-producto"]
+terminos = [["costo de produccion", 3], ["costo por producto", 3], ["costeo por producto", 3], ["costo unitario", 2],
+            ["costo de ventas por producto", 3]]
+
+[senal.rentabilidad]
+etiqueta = "Rentabilidad"
+modulos = ["rentabilidad"]
+terminos = [["rentabilidad por cliente", 3], ["rentabilidad por producto", 3], ["margen por cliente", 3], ["analisis de rentabilidad", 3],
+            ["rentabilidad", 1]]
+
+[senal.presupuestos]
+etiqueta = "Presupuestos"
+modulos = ["presupuestos"]
+terminos = [["presupuesto", 2], ["presupuestos", 2], ["ejecucion presupuestal", 3], ["presupuesto anual", 3], ["real contra presupuesto", 3]]
+
+[senal.consolidacion]
+etiqueta = "Consolidación de empresas"
+modulos = ["consolidacion"]
+terminos = [["consolidacion", 3], ["grupo empresarial", 2], ["varias empresas", 2], ["holding", 2], ["estados consolidados", 3]]
+
+[senal.cuadro-mando-financiero]
+etiqueta = "Cuadro de mando financiero"
+modulos = ["cuadro-mando-financiero"]
+terminos = [["cuadro de mando financiero", 3], ["indicadores financieros", 3], ["ratios financieros", 3]]
+
+[senal.gestion-inversiones]
+etiqueta = "Gestión de inversiones"
+modulos = ["gestion-inversiones"]
+terminos = [["cartera de inversiones", 3], ["portafolio de inversiones", 3], ["inversiones financieras", 3], ["valorizacion de cartera", 3]]
+
+[senal.inmuebles]
+etiqueta = "Bienes inmuebles y alquileres"
+modulos = ["inmuebles"]
+terminos = [["inmueble", 2], ["inmuebles", 2], ["arrendamiento", 3], ["contrato de alquiler", 3], ["alquiler", 2], ["inquilino", 3],
+            ["arrendatario", 3], ["administracion de edificios", 3], ["cuotas de mantenimiento", 2], ["cartera inmobiliaria", 3]]
+
+[senal.inmuebles-flexible]
+etiqueta = "Administración flexible de inmuebles"
+modulos = ["inmuebles-flexible"]
+terminos = [["coworking", 3], ["espacios flexibles", 3], ["alquiler por horas", 3], ["alquiler por dias", 3], ["espacios compartidos", 3]]
+
+[senal.servicios-bancarios]
+etiqueta = "Aplicaciones bancarias"
+modulos = ["servicios-bancarios"]
+terminos = [["cuentas de ahorro", 3], ["cooperativa de ahorro", 3], ["caja municipal", 3], ["microfinanzas", 3], ["prestamos", 2]]
+
+[senal.conector-financiero]
+etiqueta = "Conector de servicios financieros"
+modulos = ["conector-financiero"]
+terminos = [["swift", 3], ["cash management", 3], ["archivo de pagos al banco", 3], ["host to host", 3], ["pagos masivos", 3]]
+
+[senal.sector-publico]
+etiqueta = "Sector público"
+modulos = ["sector-publico"]
+terminos = [["entidad publica", 3], ["sector publico", 3], ["siaf", 3], ["seace", 3], ["contrataciones del estado", 3], ["municipalidad", 3]]
+
+[senal.medios]
+etiqueta = "Industria de medios"
+modulos = ["medios"]
+terminos = [["espacios publicitarios", 3], ["publicidad en medios", 3], ["pauta publicitaria", 3], ["medios de comunicacion", 2]]
+
+# --- proyectos
+[senal.proyectos]
+etiqueta = "Proyectos"
+modulos = ["proyectos"]
+terminos = [["proyectos", 2], ["avance de obra", 3], ["valorizacion de obra", 3], ["valorizaciones", 3], ["presupuesto de obra", 3],
+            ["hitos", 2], ["cronograma de obra", 3], ["horas facturables", 3], ["obra", 1]]
+
+# --- personas
+[senal.personal]
+etiqueta = "Administración de personal"
+modulos = ["personal"]
+terminos = [["empleados", 2], ["legajo", 2], ["recursos humanos", 2], ["rrhh", 2], ["contratos laborales", 3], ["trabajadores", 1],
+            ["colaboradores", 1], ["ficha del trabajador", 3]]
+
+[senal.organizacion]
+etiqueta = "Gestión de la organización"
+modulos = ["organizacion"]
+terminos = [["organigrama", 3], ["estructura organizacional", 3], ["puestos de trabajo", 2], ["cargos y puestos", 3]]
+
+[senal.tiempos]
+etiqueta = "Gestión de tiempos"
+modulos = ["tiempos"]
+terminos = [["control de asistencia", 3], ["asistencia", 2], ["marcacion", 3], ["turnos", 2], ["horas extra", 3], ["vacaciones", 2],
+            ["reloj biometrico", 3]]
+
+[senal.planilla-peru]
+etiqueta = "Planilla y nómina (Perú)"
+modulos = ["planilla-peru"]
+terminos = [["planilla", 3], ["boletas de pago", 3], ["nomina", 3], ["cts", 3], ["gratificacion", 3], ["gratificaciones", 3],
+            ["essalud", 3], ["afp", 3], ["onp", 3], ["sueldos", 2], ["remuneraciones", 2], ["plame", 3]]
+
+[senal.gastos-viaje]
+etiqueta = "Viajes y gastos"
+modulos = ["gastos-viaje"]
+terminos = [["viaticos", 3], ["rendicion de gastos", 3], ["gastos de viaje", 3], ["rendicion de cuentas de viaje", 3]]
+
+[senal.reclutamiento]
+etiqueta = "Reclutamiento y selección"
+modulos = ["reclutamiento"]
+terminos = [["reclutamiento", 3], ["seleccion de personal", 3], ["postulantes", 3], ["vacantes", 2]]
+
+[senal.talento]
+etiqueta = "Desarrollo y evaluación del talento"
+modulos = ["talento"]
+terminos = [["evaluacion de desempeno", 3], ["desarrollo del talento", 3], ["plan de carrera", 3], ["gestion del talento", 3]]
+
+[senal.capacitacion]
+etiqueta = "Capacitación"
+modulos = ["capacitacion"]
+terminos = [["capacitacion", 2], ["capacitaciones", 2], ["cursos de formacion", 3], ["plan de capacitacion", 3]]
+
+[senal.remuneracion]
+etiqueta = "Gestión de la remuneración"
+modulos = ["remuneracion"]
+terminos = [["escala salarial", 3], ["politica salarial", 3], ["bonos", 2], ["incentivos", 1], ["bandas salariales", 3]]
+
+[senal.autoservicio]
+etiqueta = "Autoservicio del empleado"
+modulos = ["autoservicio"]
+terminos = [["autoservicio del empleado", 3], ["portal del empleado", 3], ["solicitud de vacaciones", 3], ["boleta en linea", 3]]
+
+[senal.seguridad-salud]
+etiqueta = "Seguridad y salud en el trabajo"
+modulos = ["seguridad-salud"]
+terminos = [["seguridad y salud en el trabajo", 3], ["sst", 3], ["accidentes de trabajo", 3], ["epp", 3], ["riesgos laborales", 3],
+            ["matriz iper", 3]]
+
+# --- plataforma y oficina
+[senal.flujo-trabajo]
+etiqueta = "Flujos de trabajo y aprobaciones"
+modulos = ["flujo-trabajo"]
+terminos = [["flujo de aprobacion", 3], ["niveles de aprobacion", 3], ["aprobacion", 2], ["aprobaciones", 2], ["visto bueno", 2],
+            ["autorizacion de gastos", 3]]
+
+[senal.documentos]
+etiqueta = "Gestión de documentos"
+modulos = ["documentos"]
+terminos = [["gestion documental", 3], ["archivo de documentos", 2], ["adjuntar documentos", 2], ["expediente", 2],
+            ["documentos digitales", 2], ["expedientes", 2]]
+
+[senal.socios-negocio]
+etiqueta = "Socios de negocio (clientes y proveedores)"
+modulos = ["socios-negocio"]
+terminos = [["clientes y proveedores", 3], ["ficha de cliente", 2], ["ficha de proveedor", 2], ["ruc", 2], ["razon social", 2],
+            ["directorio de clientes", 3], ["maestro de clientes", 3]]
+
+[senal.datos-comunes]
+etiqueta = "Datos maestros comunes"
+modulos = ["datos-comunes"]
+terminos = [["tipo de cambio", 3], ["unidades de medida", 3], ["monedas", 2], ["ubigeo", 3], ["multimoneda", 3]]
+
+[senal.clasificacion]
+etiqueta = "Clasificación y características"
+modulos = ["clasificacion"]
+terminos = [["clasificacion de productos", 3], ["familias de productos", 3], ["atributos de producto", 3], ["categorias de productos", 3]]
+
+[senal.gobierno-datos]
+etiqueta = "Gobierno de datos maestros"
+modulos = ["gobierno-datos"]
+terminos = [["datos maestros", 3], ["maestro de materiales", 3], ["duplicados de clientes", 3], ["calidad de datos", 3]]
+
+[senal.historial-cambios]
+etiqueta = "Historial de cambios"
+modulos = ["historial-cambios"]
+terminos = [["historial de cambios", 3], ["bitacora", 2], ["auditoria de cambios", 3], ["quien modifico", 3], ["trazabilidad de cambios", 3]]
+
+[senal.acceso]
+etiqueta = "Control de acceso"
+modulos = ["acceso"]
+terminos = [["restriccion por ip", 3], ["sesiones concurrentes", 3], ["control de accesos", 3], ["accesos al sistema", 2], ["equipos autorizados", 3]]
+
+[senal.segregacion]
+etiqueta = "Segregación de funciones"
+modulos = ["segregacion"]
+terminos = [["segregacion de funciones", 3], ["control interno", 2], ["auditoria interna", 2], ["conflicto de roles", 3]]
+
+[senal.retencion]
+etiqueta = "Retención y archivado de datos"
+modulos = ["retencion"]
+terminos = [["retencion de datos", 3], ["archivado de datos", 3], ["plazo de conservacion", 3], ["conservacion de documentos", 3]]
+
+[senal.impresion]
+etiqueta = "Formularios e impresión"
+modulos = ["impresion"]
+terminos = [["formatos de impresion", 3], ["formularios impresos", 3], ["plantillas de documentos", 2], ["membrete", 2], ["impresion de documentos", 3]]
+
+[senal.gestion-salidas]
+etiqueta = "Gestión de salidas de documentos"
+modulos = ["gestion-salidas"]
+terminos = [["envio automatico de documentos", 3], ["reenvio de documentos", 3], ["envio de documentos por correo", 3]]
+
+[senal.mensajeria-interna]
+etiqueta = "Mensajería interna"
+modulos = ["mensajeria-interna"]
+terminos = [["mensajeria interna", 3], ["chat interno", 3], ["mensajes entre usuarios", 3]]
+
+[senal.agenda-tareas]
+etiqueta = "Agenda y tareas"
+modulos = ["agenda-tareas"]
+terminos = [["agenda", 2], ["tareas pendientes", 2], ["recordatorios", 2], ["calendario de tareas", 3]]
+
+[senal.notificaciones]
+etiqueta = "Avisos y notificaciones (correos)"
+modulos = ["notificaciones"]
+aviso = "Menciona correos o avisos automáticos: hoy el módulo de notificaciones es parcial; el envío real de correos depende de la integración que se configure."
+terminos = [["notificaciones", 2], ["alertas", 2], ["correo electronico", 2], ["correos automaticos", 3], ["enviar correo", 2],
+            ["mensajes automaticos", 3], ["recordatorio por correo", 3], ["avisos", 1], ["correos", 1], ["email", 1]]
+
+# --- herramientas del sistema, análisis e integración
+[senal.importacion]
+etiqueta = "Importación y carga masiva"
+modulos = ["importacion"]
+terminos = [["carga masiva", 3], ["importar desde excel", 3], ["importar excel", 3], ["migracion de datos", 3], ["importar datos", 2],
+            ["cargar desde excel", 3]]
+
+[senal.trabajos]
+etiqueta = "Trabajos programados"
+modulos = ["trabajos"]
+terminos = [["tareas programadas", 3], ["procesos nocturnos", 3], ["procesos programados", 3], ["automatizar procesos", 2]]
+
+[senal.monitoreo]
+etiqueta = "Monitoreo del sistema"
+modulos = ["monitoreo"]
+terminos = [["monitoreo del sistema", 3], ["disponibilidad del sistema", 3], ["salud del sistema", 3]]
+
+[senal.respaldo-recuperacion]
+etiqueta = "Respaldo y recuperación"
+modulos = ["respaldo-recuperacion"]
+terminos = [["backup", 3], ["copias de seguridad", 3], ["respaldo de datos", 3], ["recuperacion ante desastres", 3]]
+
+[senal.extensiones]
+etiqueta = "Campos y reglas personalizados"
+modulos = ["extensiones"]
+terminos = [["campos personalizados", 3], ["campos adicionales", 2], ["reglas personalizadas", 3]]
+
+[senal.traducciones]
+etiqueta = "Varios idiomas"
+modulos = ["traducciones"]
+terminos = [["multilingue", 3], ["varios idiomas", 3], ["traduccion de textos", 3], ["ingles y espanol", 3]]
+
+[senal.analitica]
+etiqueta = "Reportes y análisis de datos"
+modulos = ["analitica"]
+terminos = [["reportes", 2], ["informes", 1], ["indicadores", 2], ["analisis de datos", 3], ["kpi", 2], ["reporte gerencial", 3]]
+
+[senal.tableros]
+etiqueta = "Tableros e indicadores"
+modulos = ["tableros"]
+terminos = [["dashboard", 3], ["tablero", 2], ["tableros", 2], ["cuadro de mando", 3], ["indicadores clave", 3]]
+
+[senal.almacen-datos]
+etiqueta = "Almacén de datos analítico"
+modulos = ["almacen-datos"]
+terminos = [["data warehouse", 3], ["almacen de datos", 3], ["analitica avanzada", 3], ["business intelligence", 3]]
+
+[senal.integraciones]
+etiqueta = "Integraciones con otros sistemas"
+modulos = ["integraciones"]
+aviso = "Menciona integraciones con otros sistemas: el módulo de integraciones aún no existe en el ERP central; cada conexión se especifica aparte."
+terminos = [["integracion con", 3], ["integraciones", 2], ["integracion", 2], ["web service", 2], ["webservice", 2], ["api", 1],
+            ["sincronizar con", 2], ["conectar con", 2], ["interfaz con", 2]]
+
+[senal.edi]
+etiqueta = "Intercambio electrónico con terceros"
+modulos = ["edi"]
+terminos = [["edi", 3], ["intercambio electronico de datos", 3], ["intercambio electronico", 3]]
+
+[senal.compras-importacion]
+etiqueta = "Compras de importación"
+modulos = ["compras-importacion"]
+terminos = [["compras de importacion", 3], ["importacion de mercaderia", 3], ["compra al exterior", 3], ["proveedores del exterior", 3]]
+
+[senal.caja-interna]
+etiqueta = "Caja interna del grupo"
+modulos = ["caja-interna"]
+terminos = [["caja interna del grupo", 3], ["tesoreria centralizada", 3], ["prestamos entre empresas", 3], ["cuenta corriente entre empresas", 3]]
+
+[senal.controlling-logistica]
+etiqueta = "Controlling logístico"
+modulos = ["controlling-logistica"]
+terminos = [["controlling logistico", 3], ["indicadores logisticos", 3], ["costos logisticos", 3]]
+
+[senal.perfiles-configuracion]
+etiqueta = "Perfiles de configuración"
+modulos = ["perfiles-configuracion"]
+terminos = [["perfil de configuracion", 3], ["exportar la configuracion", 3], ["copiar configuracion entre", 3]]
+
+[senal.registro-aplicacion]
+etiqueta = "Registro de mensajes y errores"
+modulos = ["registro-aplicacion"]
+terminos = [["registro de errores", 3], ["registro de mensajes", 3], ["log de errores", 3], ["mensajes del sistema", 2]]
+
+# ---------------------------------------------------------------- opcionales ligados (no son módulos del ERP)
+[senal.sitio-web]
+etiqueta = "Sitio web o landing"
+modulos = []
+opcional = "diseno-web"
+terminos = [["sitio web", 2], ["pagina web", 2], ["landing", 3], ["sitio corporativo", 3], ["web de la empresa", 3],
+            ["pagina de producto", 3], ["lista de espera", 2], ["pagina de inicio", 2], ["seo", 2]]

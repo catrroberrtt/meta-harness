@@ -27,7 +27,7 @@ import tomllib
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "ayuda")
+SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "erp", "ayuda")
 IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__", ".harness", "dist", "build", ".idea", ".vscode"}
 CODIGO_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs", ".kt", ".swift",
               ".c", ".cpp", ".h", ".scala", ".vue", ".sh", ".dart", ".lua"}
@@ -1024,6 +1024,118 @@ def cmd_update(a, out, raiz):
     return delegar_instalador(raiz, "update", instancia, ["--aplicar"] if a.aplicar else [], out)
 
 
+# ------------------------------------------------------------------ erp (opción D: proponer los módulos del ERP estándar)
+def cargar_erp(raiz):
+    """Carga herramientas/harness-erp.py como módulo. Detiene con el remedio si no está."""
+    ruta = Path(raiz) / "herramientas" / "harness-erp.py"
+    if not ruta.is_file():
+        raise Detener(f"No encuentro {ruta}. Actualiza el harness (`harness update`) o indica la raíz con --harness.", 2)
+    esp = importlib.util.spec_from_file_location("harness_erp", ruta)
+    mod = importlib.util.module_from_spec(esp)
+    esp.loader.exec_module(mod)
+    return mod
+
+
+def _dentro(hijo, padre):
+    try:
+        Path(hijo).resolve().relative_to(Path(padre).resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def cmd_erp(a, out, raiz, entrada=None, interactivo=False):
+    """`harness erp`: lee los documentos del negocio (solo archivos locales), propone producto y módulos del ERP con su estado real y,
+    solo con tu confirmación, deja la propuesta en la instancia. No instala ni copia nada del ERP, no usa la red ni un modelo de lenguaje."""
+    erp = cargar_erp(raiz)
+    pregunta = entrada or input
+
+    def preguntar(texto):
+        r = pregunta(texto + " ").strip()
+        if r and parece_secreto(r):
+            raise Detener("Lo que escribiste parece un secreto (contraseña, token o clave): no lo uso. Indica una ruta de carpeta.", 2)
+        return r
+
+    try:
+        negocio = a.negocio
+        if not negocio:
+            if not interactivo:
+                raise Detener("Falta indicar la carpeta con los documentos del negocio: `harness erp --negocio <carpeta> --erp-base <ruta>`.\n"
+                              "Es una carpeta local con archivos .md, .txt, .csv o .xlsx (por ejemplo, exportados de Drive u otra fuente); no leo nada más ni uso la red.", 2)
+            negocio = preguntar("¿Qué carpeta con documentos del negocio debo leer? (archivos .md, .txt, .csv o .xlsx exportados; solo lectura, sin red):")
+        if not negocio:
+            raise Detener("Sin carpeta de documentos no puedo proponer nada: no adivino de dónde leer. Repite con `--negocio <carpeta>`.", 2)
+        negocio = Path(negocio).expanduser().resolve()
+        if not negocio.is_dir():
+            raise Detener(f"No existe la carpeta de documentos {negocio}.\nIndica una carpeta local con los documentos del negocio.", 2)
+        erp_base = a.erp_base
+        if not erp_base:
+            if not interactivo:
+                raise Detener("Falta indicar dónde está el ERP estándar: `--erp-base <ruta>` (la carpeta del repositorio del ERP; solo se lee su `modulos/catalogo.json`).", 2)
+            erp_base = preguntar("¿Dónde está la carpeta del ERP estándar (erp-base)? (solo lectura):")
+        if not erp_base:
+            raise Detener("Sin la ruta del ERP no tengo el catálogo de módulos. Repite con `--erp-base <ruta>`.", 2)
+        erp_base = Path(erp_base).expanduser().resolve()
+        instancia = a.instancia
+        if not instancia and interactivo and not a.json:
+            instancia = preguntar("¿En qué carpeta de instancia dejo la propuesta? (Enter = solo mostrarla, sin escribir):")
+        instancia = Path(instancia).expanduser().resolve() if instancia else None
+        if instancia:
+            if _dentro(instancia, negocio):
+                raise Detener("La instancia no puede estar dentro de la carpeta de documentos del negocio: esos documentos se leen sin modificarlos "
+                              "(y la propuesta escrita ahí se leería como si fuera un documento del negocio).", 2)
+            if _dentro(instancia, erp_base):
+                raise Detener("La instancia no puede estar dentro del ERP estándar: ese repositorio es de solo lectura para el harness.", 2)
+            if not instancia.is_dir():
+                raise Detener(f"No existe la carpeta de la instancia {instancia}.\nCrea la instancia primero (`harness` o `harness instalar <instancia> --modo init`) o indica otra.", 2)
+        senales = Path(a.senales).expanduser() if a.senales else Path(raiz) / "perfiles" / "_erp" / "senales.toml"
+        try:
+            p = erp.generar(negocio, erp_base, senales, raiz, marca_en_instancia=((instancia / "sitio" / "DISENO.md").is_file() if instancia else None))
+        except erp.ErrorErp as e:
+            raise Detener(f"{e}", 2)
+        plan = erp.estado_escritura(instancia, p) if instancia else []
+        etiqueta = {"crear": "crearía", "actualizar": "actualizaría", "igual": "ya está igual", "conservar": "ya existe; no lo piso"}
+        if not a.json:
+            out.titulo("Propuesta de ERP (solo lectura: no se instaló ni copió nada)")
+            out.p(erp.resumen_pantalla(p))
+            if instancia:
+                out.p("\nEn la instancia (" + str(instancia) + "):")
+                for rel, accion in plan:
+                    out.p(f"  - {etiqueta[accion]}: {rel}")
+        escribir_ya = bool(instancia) and (a.aplicar or a.si)
+        if instancia and not escribir_ya:
+            if interactivo and not a.json:
+                r = preguntar("\n¿Escribo la propuesta en la instancia? [s/N]")
+                escribir_ya = r.strip().lower() in SI
+            elif not a.json:
+                out.p("\nSin terminal y sin --aplicar: no escribí nada. Repite con --aplicar para dejar la propuesta en la instancia.")
+        hechas = []
+        if escribir_ya:
+            try:
+                hechas = erp.escribir(instancia, p)
+            except erp.ErrorErp as e:
+                raise Detener(f"{e}", 2)
+        if a.json:
+            print(json.dumps({"propuesta": p, "escritura": {"aplicado": bool(hechas), "archivos": [{"ruta": r, "accion": ac} for r, ac in (hechas or plan)]}},
+                             ensure_ascii=False, indent=2), file=out.flujo)
+            return 0
+        if not instancia:
+            out.p("\nNo indicaste instancia, así que no escribí nada. Para dejar la propuesta: `harness erp --negocio ... --erp-base ... --instancia <carpeta>`.")
+        elif hechas:
+            out.p("\nListo:")
+            hecho = {"crear": "creado", "actualizar": "actualizado", "igual": "sin cambios", "conservar": "conservado (ya existía)"}
+            for rel, accion in hechas:
+                out.p(f"  - {hecho[accion]}: {rel}")
+            out.p("Siguiente: revisa erp/propuesta-erp.md, confirma o quita módulos y comprueba el rastro con "
+                  f"`harness trazar {instancia / 'cambios' / erp.SLUG_CAMBIO} --etapa especificacion`. El compositor del ERP aún no existe: no se instaló nada.")
+        elif interactivo:
+            out.p("\nNo escribí nada.")
+        return 0
+    except (KeyboardInterrupt, EOFError):
+        out.p("\nInterrumpido. No se escribió nada.")
+        return 130
+
+
 # ------------------------------------------------------------------ línea de comandos
 AYUDA = """Qué comando uso cuándo (mapa completo: docs/MAPA-DE-COMANDOS.md)
 
@@ -1033,9 +1145,10 @@ AYUDA = """Qué comando uso cuándo (mapa completo: docs/MAPA-DE-COMANDOS.md)
   2. ADOPTAR un proyecto que ya existe (no toca tu código ni tu estándar)
        harness                                  el asistente detecta el caso A y propone «adopt»
        harness instalar <instancia> --modo adopt --proyecto <carpeta>
-  3. EMPEZAR un proyecto nuevo (B) o replicar un sistema (C)
+  3. EMPEZAR un proyecto nuevo (B), replicar un sistema (C) o usar un ERP estándar (D)
        harness                                  el asistente pregunta lo justo
        harness instalar <instancia> --modo init      (o --modo migrar)
+       harness erp --negocio <carpeta> --erp-base <ruta>   propone los módulos del ERP que tu negocio necesita
   4. TRABAJAR una tarea (cada cambio deja su rastro de punta a punta)
        harness siguiente [instancia]            dónde estoy y qué sigue (solo lectura)
        harness trazar <cambio> [--etapa E]      comprueba requisito -> prueba -> commit -> evidencia
@@ -1056,6 +1169,7 @@ EJEMPLOS = {
     "doctor": "harness doctor\n  harness doctor ./mi-instancia --json",
     "estado": "harness estado ./mi-instancia",
     "siguiente": "harness siguiente\n  harness siguiente ./mi-instancia --json",
+    "erp": "harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base              (solo muestra la propuesta)\n  harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base --instancia ./mi-instancia --aplicar",
     "trazar": "harness trazar cambios/2026-01-10-entregas-parciales\n  harness trazar cambios/2026-01-10-entregas-parciales --etapa delegacion\n  harness trazar cambios/2026-01-10-entregas-parciales --repo ./mi-proyecto",
 }
 DESCRIPCION = {
@@ -1066,6 +1180,7 @@ DESCRIPCION = {
     "estado": "Muestra modo, versión, qué hay instalado, qué cambió después y qué falta del piso.",
     "siguiente": "Dónde estoy y qué sigue: estado de la carpeta o instancia y pasos sugeridos, en orden. Solo lectura.",
     "trazar": "Comprueba la trazabilidad de un cambio (especificación, delegación, matriz, cierre). Solo lectura.",
+    "erp": "Opción ERP: lee los documentos del negocio (archivos locales), propone producto y módulos del ERP estándar con su estado real y, solo si confirmas, deja la propuesta en la instancia. No instala ni copia nada del ERP.",
 }
 TRADUCCIONES = (("the following arguments are required: ", "falta indicar: "), ("unrecognized arguments: ", "argumentos no reconocidos: "),
                 ("expected one argument", "falta el valor de la opción"), ("invalid choice: ", "opción no válida: "))
@@ -1191,6 +1306,15 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
                            help="hasta qué puerta comprobar (por defecto, cierre)")
             p.add_argument("--repo", help="repositorio del proyecto: comprueba que los commits y archivos citados existen (git local)")
             p.add_argument("--json", action="store_true")
+        elif sub == "erp":
+            p.add_argument("--negocio", help="carpeta local con los documentos del negocio (.md, .txt, .csv, .xlsx); si falta, la pregunta")
+            p.add_argument("--erp-base", dest="erp_base", help="carpeta del repositorio del ERP estándar (se lee modulos/catalogo.json; nunca se escribe)")
+            p.add_argument("--instancia", help="carpeta de la instancia donde dejar la propuesta (sin esto, solo se muestra)")
+            p.add_argument("--senales", help="archivo de señales alternativo (por defecto perfiles/_erp/senales.toml)")
+            p.add_argument("--aplicar", action="store_true", help="escribe la propuesta en la instancia sin preguntar; sin esto pide confirmación")
+            p.add_argument("--si", action="store_true", help="igual que --aplicar")
+            p.add_argument("--no-interactivo", action="store_true", help="no pregunta: muestra la propuesta y sale sin escribir")
+            p.add_argument("--json", action="store_true", help="una sola salida JSON (no interactivo)")
         elif sub == "ayuda":
             pass
         else:
@@ -1208,6 +1332,10 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             return cmd_montar(a, out, raiz)
         if sub == "trazar":
             return cmd_trazar(a, out, raiz)
+        if sub == "erp":
+            inter = interactivo if interactivo is not None else (sys.stdin.isatty() and sys.stdout.isatty())
+            inter = bool(inter) and not (a.no_interactivo or a.json)
+            return cmd_erp(a, out, raiz, entrada or input, inter)
         if sub == "ayuda":
             parser_asistente().print_help(salida)
             return 0

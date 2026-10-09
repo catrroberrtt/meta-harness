@@ -44,3 +44,7 @@ adaptadores-agente/copilot/adaptador.py | secreto | tabla de rutas y nombres de 
 # --- este mismo archivo cita los textos que justifica ---
 .permitidos.txt | persona | cita `git@github.com` y `python@3.12` para explicar por qué no son personas
 .permitidos.txt | secreto | cita nombres de campo (`VAR_CONTRASENA`, `imprimir_secretos`) y valores falsos de prueba para justificarlos
+
+# --- opción ERP (0.5.0) ---
+cli/tests/test_erp.py | secreto | `password=abcdef` es un valor falso para probar que una respuesta con forma de secreto se descarta
+herramientas/tests/test_erp.py | secreto | `password=SuperClave...` es un valor falso para probar que el fragmento de evidencia lo enmascara

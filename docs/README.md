@@ -20,6 +20,10 @@ Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia 
 - `../metodo/terminado-y-trazabilidad.md`: la cadena de punta a punta, la matriz de trazabilidad y la lista de cierre.
 - `ANALISIS-CLAUDE-SKILLS.md`: qué se rescató y qué no de un catálogo público de skills, con atribución.
 
+## Opción ERP
+
+- `OPCION-ERP.md`: `harness erp` (estado D): del negocio descrito en documentos locales a una propuesta de módulos del ERP estándar con su estado real; qué no hace aún; contrato con el compositor; ejemplo completo.
+
 <!-- open-design:inicio -->
 ## Webs de empresa
 

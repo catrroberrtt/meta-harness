@@ -10,6 +10,8 @@ Un perfil por stack; se elige por proyecto según la necesidad, sin sobreingenie
 | `angular-material` | frontend | por extraer |
 | `aws-ecs` | infraestructura | por extraer |
 
+`perfiles/_erp/` no es un perfil de stack (el guion bajo lo excluye del lint): guarda los datos editables de la opción ERP (`senales.toml`, ver `perfiles/_erp/README.md`).
+
 ## Estructura obligatoria de un perfil
 
 `README.md`, `arquitectura.md`, `patrones.md`, `codificacion.md`, `datos.md`, `pruebas.md`, `seguridad.md`, `rendimiento.md`, `observabilidad.md`, `errores-frecuentes/README.md`, `recetas/README.md`, `evidencia.md`.

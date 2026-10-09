@@ -1,5 +1,5 @@
 <!-- tipo: guia · capa: 4 -->
-<!-- revisado: 2026-10-08 · vence: 90d · fuente: cli/harness_cli.py y sus pruebas (cli/tests/test_interfaz.py); cada comando se ejecutó -->
+<!-- revisado: 2026-10-09 · vence: 90d · fuente: cli/harness_cli.py y sus pruebas (cli/tests/test_interfaz.py); cada comando se ejecutó -->
 
 # Qué comando uso cuándo
 
@@ -12,6 +12,7 @@ Una sola entrada, `harness`. La misma ayuda sale con `harness -h` o `harness ayu
 | 1 · Instalar | Replicar en una máquina nueva la instancia de mi equipo | `harness instalar owner/nombre` (primero `--plan` si quiero solo mirar) | Sí, tras confirmar |
 | 2 · Adoptar | Entrar a un proyecto que ya existe **sin tocar su código ni su estándar** | `harness` (el asistente detecta el caso A) o `harness instalar <instancia> --modo adopt --proyecto <carpeta>` | `adopt` deja el informe en la instancia, nunca en el proyecto |
 | 3 · Empezar | Arrancar un proyecto nuevo (caso B) o replicar un sistema (caso C) | `harness` o `harness instalar <instancia> --modo init` / `--modo migrar` | Sí, tras confirmar |
+| 3c · Usar un ERP estándar (estado D) | Saber qué módulos del ERP necesita mi negocio, a partir de mis documentos | `harness erp --negocio <carpeta> --erp-base <ruta> [--instancia <carpeta>]` (`docs/OPCION-ERP.md`) | Solo con tu «s» o `--aplicar`, y solo en la instancia; no instala nada del ERP |
 | 3b · Preparar agentes | Dejar listos `AGENTS.md`, skills y permisos de mi agente | `harness montar <instancia>` (plan) y luego `--aplicar` | Solo con `--aplicar`, solo dentro de la instancia |
 | 4 · Trabajar | Saber **dónde estoy y qué sigue** | `harness siguiente [instancia]` | No |
 | 4 · Trabajar | Comprobar que un cambio no dejó huecos (requisito sin prueba, tarea sin contrato…) | `harness trazar <cambio> [--etapa E] [--repo <proyecto>]` | No |
@@ -31,6 +32,12 @@ Tu estándar manda: el harness lo **lee y lo respeta**; lo nuevo se ofrece, no s
 4. `harness montar <instancia>` → `--aplicar`.
 5. Por cada tarea: `plantillas/especificacion.md` → `harness trazar … --etapa especificacion` … → `--etapa cierre`. Si ya numeras requisitos con otra clave (por ejemplo la de tu tracker), déjala como alias dentro del texto del requisito (`RQ-01 · [CLAVE-123] …`): la herramienta exige el patrón `RQ-NN` / `CA-NN.n`, no admite otro.
 6. `harness doctor` y `harness update` cuando salga una versión.
+
+### D. Negocio que usará un ERP estándar (opción ERP)
+1. `harness erp --negocio <carpeta-de-documentos> --erp-base <ruta-del-erp>`: lee los documentos (archivos locales), muestra la propuesta con el **estado real** de cada módulo y lo que aún no existe. No escribe.
+2. Con `--instancia <carpeta>` te pregunta y deja `erp/propuesta-erp.md` y `.json` y el cambio `cambios/erp-composicion/` (especificación y matriz).
+3. Revisa la propuesta, confirma o quita módulos, resuelve las suposiciones abiertas y comprueba con `harness trazar cambios/erp-composicion --etapa especificacion`. La composición real la hará el compositor del ERP (aún sin código): contrato en `docs/OPCION-ERP.md`.
+4. Si habla de sitio web: el adaptador `diseno-web` (se ofrece, no se ejecuta).
 
 ### B. Entorno centralizado (este repositorio)
 1. `bash verificar.sh` antes de cada commit: sintaxis, pruebas de herramientas, instalador, CLI y adaptadores, frescura y referencias prohibidas.

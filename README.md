@@ -50,6 +50,12 @@ Cada cambio recorre la misma cadena (propuesta, análisis, especificación, dele
 
 Esqueleto (0.1.x): estructura, contratos de adaptadores, plantilla de convenciones, `adopt` funcional y dos herramientas genéricas. El resto de documentos llega a cada carpeta solo cuando supera la medición (tipo declarado y especificidad 0).
 
+<!-- opcion-erp:inicio -->
+## Opción ERP (estado D)
+
+`harness erp --negocio <carpeta> --erp-base <ruta>` lee los documentos del negocio y propone qué módulos de un ERP estándar (que vive en otro repositorio) necesita, con su estado real y lo que aún no existe; no instala nada. Señales editables en `perfiles/_erp/senales.toml`. Guía y contrato con el compositor: `docs/OPCION-ERP.md`.
+<!-- opcion-erp:fin -->
+
 <!-- open-design:inicio -->
 ## Webs de empresa (landing, sitio corporativo)
 

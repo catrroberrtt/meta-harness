@@ -13,7 +13,9 @@ Reglas del asistente:
 Codigos de salida: 0 bien; 1 problema (doctor) o error; 2 detenido (faltan accesos, informacion o una decision); 130 interrumpido.
 """
 import argparse
+import difflib
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -25,7 +27,7 @@ import tomllib
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado")
+SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "ayuda")
 IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__", ".harness", "dist", "build", ".idea", ".vscode"}
 CODIGO_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs", ".kt", ".swift",
               ".c", ".cpp", ".h", ".scala", ".vue", ".sh", ".dart", ".lua"}
@@ -679,7 +681,7 @@ def mostrar_doctor(filas, out):
 
 def estado(instancia, raiz=RAIZ):
     instancia = Path(instancia).resolve()
-    e = {"instancia": str(instancia), "es_instancia": (instancia / "harness.lock").exists()}
+    e = {"instancia": str(instancia), "existe": instancia.is_dir(), "es_instancia": (instancia / "harness.lock").exists()}
     if not e["es_instancia"]:
         return e
     lock = tomllib.loads((instancia / "harness.lock").read_text(encoding="utf-8"))
@@ -719,6 +721,10 @@ def estado(instancia, raiz=RAIZ):
 
 def mostrar_estado(e, out):
     if not e["es_instancia"]:
+        if not e.get("existe", True):
+            out.p(f"La carpeta {e['instancia']} no existe. Indica la carpeta de tu instancia (`harness estado <instancia>`) "
+                  "o corre `harness` para armar una; `harness siguiente` te dice qué sigue.")
+            return 1
         out.p(f"{e['instancia']} no es una instancia instalada (no tiene harness.lock). Corre `harness` para armarla.")
         return 1
     out.p(f"Instancia: {e['instancia']}")
@@ -736,6 +742,131 @@ def mostrar_estado(e, out):
     if e.get("sesion") == "en_curso":
         out.p("Hay una sesión del asistente sin terminar: corre `harness` para retomarla.")
     return 0
+
+
+# ------------------------------------------------------------------ siguiente (dónde estoy y qué sigue)
+def cargar_trazabilidad(raiz):
+    """Carga herramientas/harness-trazabilidad.py como módulo (solo lectura). None si no está."""
+    ruta = Path(raiz) / "herramientas" / "harness-trazabilidad.py"
+    if not ruta.is_file():
+        return None
+    esp = importlib.util.spec_from_file_location("harness_trazabilidad", ruta)
+    mod = importlib.util.module_from_spec(esp)
+    esp.loader.exec_module(mod)
+    return mod
+
+
+def _version(t):
+    try:
+        return tuple(int(x) for x in str(t).strip().split("."))
+    except ValueError:
+        return None
+
+
+SIGUIENTE_POR_ETAPA = {
+    "especificacion": "completa la especificación (plantillas/especificacion.md)",
+    "delegacion": "aprueba la especificación y delega con contrato de archivos (plantillas/delegacion.md)",
+    "implementacion": "completa la matriz de trazabilidad (plantillas/matriz-trazabilidad.md)",
+    "cierre": "completa el cierre (plantillas/cierre-de-cambio.md)",
+}
+
+
+def siguiente(base, raiz=RAIZ):
+    """Estado de solo lectura de una carpeta y lista ordenada de pasos sugeridos. No escribe nada."""
+    base = Path(base).expanduser().resolve()
+    raiz = Path(raiz)
+    r = {"carpeta": str(base), "existe": base.is_dir(), "es_instancia": False, "pasos": [], "cambios": [], "cambios_cerrables": 0}
+    try:
+        r["version_harness"] = (raiz / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        r["version_harness"] = "?"
+    if not r["existe"]:
+        r["pasos"].append({"que": "La carpeta no existe: indica la de tu instancia o proyecto", "comando": "harness siguiente <carpeta>"})
+        return r
+    if not (base / "harness.lock").exists():
+        if (base / "especificacion.md").is_file():
+            r["pasos"].append({"que": "Esta carpeta parece un cambio: comprueba su trazabilidad", "comando": f"harness trazar {base}"})
+            return r
+        d = detectar_caso(base)
+        r["caso"], r["confianza"], r["porque"] = d["caso"], d["confianza"], d["porque"]
+        r["pasos"].append({"que": f"No es una instancia del harness. Parece el caso {NOMBRE_CASO[d['caso']]} ({d['porque']})"
+                                  + ("; confírmalo con --caso" if d["confianza"] == "duda" else ""),
+                           "comando": f"harness --carpeta {base} --no-interactivo" if d["confianza"] == "alta" else f"harness --carpeta {base}"})
+        r["pasos"].append({"que": "El asistente muestra el plan y no escribe nada hasta tu «s»", "comando": f"harness --carpeta {base}"})
+        return r
+    e = estado(base, raiz)
+    r["es_instancia"] = True
+    r["version_instancia"], r["modo"] = e.get("version_instancia"), e.get("modo")
+    vi, vh = _version(e.get("version_instancia")), _version(r["version_harness"])
+    if vi and vh and vi < vh:
+        r["pasos"].append({"que": f"La instancia fija {e['version_instancia']} y el harness está en {r['version_harness']}: actualiza (muestra el plan)", "comando": f"harness update {base}"})
+    elif vi and vh and vi > vh:
+        r["pasos"].append({"que": f"La instancia fija {e['version_instancia']}, más nueva que este harness ({r['version_harness']}): actualiza el harness local", "comando": "git -C <harness> pull"})
+    for m in e.get("modificados", []):
+        r["pasos"].append({"que": "Cambió después de instalar (el update no lo pisa): " + m, "comando": f"harness estado {base}"})
+    for p in e.get("pendiente", []):
+        r["pasos"].append({"que": f"Piso pendiente — {p['punto']}: {p['detalle']}", "comando": f"harness estado {base}"})
+    try:
+        est = json.loads((base / ".harness" / "estado.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        est = {}
+    if est and "montaje" not in est:
+        r["pasos"].append({"que": "Falta montar el entorno de los agentes (AGENTS.md, skills, permisos): muestra el plan primero", "comando": f"harness montar {base}"})
+    if e.get("sesion") == "en_curso":
+        r["pasos"].append({"que": "Hay una sesión del asistente sin terminar", "comando": "harness"})
+    tz = cargar_trazabilidad(raiz)
+    carpeta_cambios = base / "cambios"
+    if tz and carpeta_cambios.is_dir():
+        for c in sorted(p for p in carpeta_cambios.iterdir() if p.is_dir() and not p.name.startswith(".")):
+            etapa, inf = tz.estado_del_cambio(c)
+            if etapa == "cerrable":
+                r["cambios_cerrables"] += 1
+                continue
+            primero = next((h for h in inf["hallazgos"] if h["nivel"] == "ERROR"), None)
+            r["cambios"].append({"cambio": c.name, "etapa": etapa, "errores": inf["resumen"]["errores"],
+                                 "primer_error": f"{primero['codigo']} {primero['donde']}: {primero['mensaje']}" if primero else ""})
+        for c in r["cambios"][:10]:
+            r["pasos"].append({"que": f"Cambio «{c['cambio']}» ({c['errores']} error(es) en la puerta de {c['etapa']}): {SIGUIENTE_POR_ETAPA[c['etapa']]}. Primero: {c['primer_error']}",
+                               "comando": f"harness trazar {carpeta_cambios / c['cambio']} --etapa {c['etapa']}"})
+    if not r["pasos"]:
+        r["pasos"].append({"que": "Nada pendiente. Para empezar un cambio con trazabilidad, copia plantillas/especificacion.md a cambios/<fecha>-<slug>/", "comando": "harness trazar cambios/<fecha>-<slug> --etapa especificacion"})
+    return r
+
+
+def mostrar_siguiente(r, out):
+    out.p(f"Dónde estoy: {r['carpeta']}")
+    if not r["existe"]:
+        pass
+    elif r["es_instancia"]:
+        out.p(f"  Instancia del harness (modo {r.get('modo', '?')}, fija {r.get('version_instancia')}; harness local {r['version_harness']})")
+        if r["cambios_cerrables"]:
+            out.p(f"  Cambios sin errores hasta el cierre: {r['cambios_cerrables']}")
+    out.p("Qué sigue:")
+    for i, p in enumerate(r["pasos"], 1):
+        out.p(f"  {i}. {p['que']}")
+        if p.get("comando"):
+            out.p(f"       {p['comando']}")
+    out.p("(Solo lectura: este comando no escribió nada. Mapa completo: docs/MAPA-DE-COMANDOS.md)")
+    return 0 if r["existe"] else 1
+
+
+def cmd_trazar(a, out, raiz):
+    herramienta = Path(raiz) / "herramientas" / "harness-trazabilidad.py"
+    if not herramienta.is_file():
+        raise Detener(f"No encuentro {herramienta}. Actualiza el harness (`harness update`) o indica la raíz con --harness.", 2)
+    cambio = Path(a.cambio).expanduser() if a.cambio else Path(os.getcwd())
+    if not a.cambio and not (cambio / "especificacion.md").is_file():
+        raise Detener("Esta carpeta no parece la de un cambio (falta especificacion.md).\n"
+                      "Indica la carpeta: `harness trazar cambios/<fecha>-<slug>`\n"
+                      f"Para ver cómo es uno completo: `harness trazar {Path(raiz) / 'plantillas' / 'ejemplos' / 'cambio-ejemplo'}`", 2)
+    cmd = [sys.executable, herramienta, cambio, "--etapa", a.etapa]
+    if a.repo:
+        cmd += ["--repo", a.repo]
+    if a.json:
+        cmd.append("--json")
+    r = correr(cmd)
+    out.p((r.stdout + r.stderr).rstrip())
+    return r.returncode
 
 
 # ------------------------------------------------------------------ instalar / update
@@ -887,19 +1018,79 @@ def cmd_montar(a, out, raiz):
 
 def cmd_update(a, out, raiz):
     instancia = Path(a.instancia or os.getcwd()).expanduser().resolve()
+    if not instancia.is_dir():
+        raise Detener(f"No existe la carpeta {instancia}.\nIndica la carpeta de una instancia ya instalada (`harness update <instancia>`). "
+                      "Para crear una: `harness` (asistente) o `harness instalar <instancia> --modo init`.", 2)
     return delegar_instalador(raiz, "update", instancia, ["--aplicar"] if a.aplicar else [], out)
 
 
 # ------------------------------------------------------------------ línea de comandos
+AYUDA = """Qué comando uso cuándo (mapa completo: docs/MAPA-DE-COMANDOS.md)
+
+  1. INSTALAR en una máquina nueva (replica la instancia de tu equipo)
+       harness instalar owner/nombre            plan completo y una sola confirmación
+       harness instalar owner/nombre --plan     solo muestra el plan
+  2. ADOPTAR un proyecto que ya existe (no toca tu código ni tu estándar)
+       harness                                  el asistente detecta el caso A y propone «adopt»
+       harness instalar <instancia> --modo adopt --proyecto <carpeta>
+  3. EMPEZAR un proyecto nuevo (B) o replicar un sistema (C)
+       harness                                  el asistente pregunta lo justo
+       harness instalar <instancia> --modo init      (o --modo migrar)
+  4. TRABAJAR una tarea (cada cambio deja su rastro de punta a punta)
+       harness siguiente [instancia]            dónde estoy y qué sigue (solo lectura)
+       harness trazar <cambio> [--etapa E]      comprueba requisito -> prueba -> commit -> evidencia
+  5. VERIFICAR
+       harness doctor [instancia]               versión, frescura, herramientas y secretos
+       harness estado [instancia]               qué hay instalado y qué falta del piso
+  6. ACTUALIZAR
+       harness update [instancia]               muestra el plan; con --aplicar escribe
+       harness montar [instancia]               entorno de los agentes; con --aplicar escribe
+
+Nada se escribe sin --aplicar o sin responder «s» a la confirmación. Cada comando acepta -h.
+Códigos de salida: 0 bien · 1 problema o error · 2 detenido (falta algo; el mensaje dice qué) · 130 interrumpido."""
+
+EJEMPLOS = {
+    "instalar": "harness instalar mi-equipo/mi-instancia --plan\n  harness instalar mi-equipo/mi-instancia\n  harness instalar ./mi-instancia --modo adopt --proyecto ./mi-proyecto",
+    "update": "harness update ./mi-instancia            (muestra el plan)\n  harness update ./mi-instancia --aplicar",
+    "montar": "harness montar ./mi-instancia --agentes claude-code\n  harness montar ./mi-instancia --aplicar",
+    "doctor": "harness doctor\n  harness doctor ./mi-instancia --json",
+    "estado": "harness estado ./mi-instancia",
+    "siguiente": "harness siguiente\n  harness siguiente ./mi-instancia --json",
+    "trazar": "harness trazar cambios/2026-01-10-entregas-parciales\n  harness trazar cambios/2026-01-10-entregas-parciales --etapa delegacion\n  harness trazar cambios/2026-01-10-entregas-parciales --repo ./mi-proyecto",
+}
+DESCRIPCION = {
+    "instalar": "Instala una instancia: carpeta local o repositorio (https://, ssh://, git@host:ruta u owner/nombre).",
+    "update": "Actualiza lo del harness en una instancia ya instalada (sin --aplicar solo muestra el plan).",
+    "montar": "Monta el entorno de los agentes sobre una instancia creada (AGENTS.md, skills, permisos).",
+    "doctor": "Comprueba versión, frescura de documentos, herramientas y accesos con aspecto de secreto.",
+    "estado": "Muestra modo, versión, qué hay instalado, qué cambió después y qué falta del piso.",
+    "siguiente": "Dónde estoy y qué sigue: estado de la carpeta o instancia y pasos sugeridos, en orden. Solo lectura.",
+    "trazar": "Comprueba la trazabilidad de un cambio (especificación, delegación, matriz, cierre). Solo lectura.",
+}
+TRADUCCIONES = (("the following arguments are required: ", "falta indicar: "), ("unrecognized arguments: ", "argumentos no reconocidos: "),
+                ("expected one argument", "falta el valor de la opción"), ("invalid choice: ", "opción no válida: "))
+
+
+class Parser(argparse.ArgumentParser):
+    """ArgumentParser con errores en español y ejemplos al pie; mismo código de salida (2)."""
+
+    def __init__(self, *args, ejemplos=None, **kw):
+        super().__init__(*args, **kw)
+        self.ejemplos = ejemplos
+
+    def error(self, mensaje):
+        for en, es in TRADUCCIONES:
+            mensaje = mensaje.replace(en, es)
+        self.print_usage(sys.stderr)
+        extra = f"\nEjemplos:\n  {self.ejemplos}\n" if self.ejemplos else ""
+        self.exit(2, f"{self.prog}: error: {mensaje}\n{extra}\nQué comando uso cuándo: `harness ayuda`\n")
+
+
 def parser_asistente():
-    p = argparse.ArgumentParser(
+    p = Parser(
         prog="harness", formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Asistente del harness: mira la carpeta, detecta el caso (A/B/C), pregunta lo justo y no escribe sin tu confirmación.",
-        epilog="Subcomandos:\n  harness instalar <instancia>   instala una instancia (carpeta local o repositorio)\n"
-               "  harness update [instancia]     actualiza lo del harness en la instancia\n"
-               "  harness doctor [instancia]     comprueba versión, frescura, herramientas y secretos\n"
-               "  harness estado [instancia]     modo, versión, qué hay instalado y qué falta\n"
-               "Cada subcomando acepta -h.")
+        epilog=AYUDA)
     p.add_argument("--carpeta", help="carpeta a mirar (por defecto, la actual)")
     p.add_argument("--si", action="store_true", help="acepta el plan y lo aplica (sin preguntar)")
     p.add_argument("--json", action="store_true", help="salida en JSON (no interactivo)")
@@ -921,6 +1112,12 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
     salida = salida or sys.stdout
     raiz = Path(raiz or RAIZ)
     sub = argv[0] if argv and argv[0] in SUBCOMANDOS else None
+    if sub is None and argv and not argv[0].startswith("-"):
+        # El asistente no recibe palabras sueltas: es un comando mal escrito. Se dice cuál se parece (mismo código de salida: 2).
+        cerca = difflib.get_close_matches(argv[0], SUBCOMANDOS, n=1, cutoff=0.5)
+        print(f"harness: no existe el comando «{argv[0]}»." + (f" ¿Quisiste decir `harness {cerca[0]}`?" if cerca else "")
+              + "\nComandos: " + ", ".join(SUBCOMANDOS) + ".\nQué comando uso cuándo: `harness ayuda` (o `harness -h`).", file=sys.stderr)
+        return 2
     try:
         if sub is None:
             a = parser_asistente().parse_args(argv)
@@ -954,7 +1151,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
                 inf.setdefault("aplicado", False)
                 print(json.dumps(inf, ensure_ascii=False, indent=2), file=salida)
             return codigo
-        p = argparse.ArgumentParser(prog="harness " + sub)
+        p = Parser(prog="harness " + sub, ejemplos=EJEMPLOS.get(sub), description=DESCRIPCION.get(sub, ""),
+                   epilog=("Ejemplos:\n  " + EJEMPLOS[sub]) if sub in EJEMPLOS else None, formatter_class=argparse.RawDescriptionHelpFormatter)
         p.add_argument("--harness", help="raíz del harness")
         if sub == "instalar":
             p.add_argument("instancia", help="carpeta local, o repositorio (https://, ssh://, git@host:ruta u owner/nombre)")
@@ -976,8 +1174,16 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             p.add_argument("--aplicar", action="store_true", help="escribe; sin esto solo se muestra el plan")
             p.add_argument("--si", action="store_true", help="salta solo las preguntas de bajo riesgo")
             p.add_argument("--json", action="store_true")
+        elif sub == "trazar":
+            p.add_argument("cambio", nargs="?", help="carpeta del cambio (por defecto, la actual si tiene especificacion.md)")
+            p.add_argument("--etapa", choices=("especificacion", "delegacion", "implementacion", "cierre"), default="cierre",
+                           help="hasta qué puerta comprobar (por defecto, cierre)")
+            p.add_argument("--repo", help="repositorio del proyecto: comprueba que los commits y archivos citados existen (git local)")
+            p.add_argument("--json", action="store_true")
+        elif sub == "ayuda":
+            pass
         else:
-            p.add_argument("instancia", nargs="?")
+            p.add_argument("instancia", nargs="?", help="carpeta de la instancia (por defecto, la actual)")
             p.add_argument("--json", action="store_true")
         a = p.parse_args(argv[1:])
         if a.harness:
@@ -989,7 +1195,18 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             return cmd_update(a, out, raiz)
         if sub == "montar":
             return cmd_montar(a, out, raiz)
+        if sub == "trazar":
+            return cmd_trazar(a, out, raiz)
+        if sub == "ayuda":
+            parser_asistente().print_help(salida)
+            return 0
         base = a.instancia or os.getcwd()
+        if sub == "siguiente":
+            r = siguiente(base, raiz)
+            if a.json:
+                print(json.dumps(r, ensure_ascii=False, indent=2), file=salida)
+                return 0 if r["existe"] else 1
+            return mostrar_siguiente(r, out)
         if sub == "doctor":
             filas = doctor(base if (a.instancia or (Path(base) / "harness.lock").exists()) else None, raiz)
             if a.json:

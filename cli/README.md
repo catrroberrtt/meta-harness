@@ -12,6 +12,9 @@ Un solo comando, con asistente guiado (spec §20). Biblioteca estándar de Pytho
 | `harness update [instancia]` | Plan de `update` (con `--aplicar`, lo escribe) |
 | `harness doctor [instancia]` | Versión del harness y de `harness.lock`, frescura de documentos, herramientas (`git`, `python3` requeridas; `gh`, `ssh`, `node` solo informadas) y accesos locales con aspecto de secreto o versionados. Exit 0 si todo bien, 1 si hay problemas (con la acción sugerida) |
 | `harness estado [instancia]` | Modo, versión, qué hay instalado, qué cambió después y qué quedó pendiente del piso |
+| `harness siguiente [instancia]` | **Dónde estoy y qué sigue** (solo lectura): si la carpeta no es una instancia, qué caso parece y cómo empezar; si lo es, versión, piso pendiente, montaje, sesión sin terminar y el siguiente paso de cada cambio en `cambios/` con su comando. `--json` |
+| `harness trazar [cambio]` | Comprueba la trazabilidad de un cambio (`herramientas/harness-trazabilidad.py`): `--etapa especificacion\|delegacion\|implementacion\|cierre`, `--repo <proyecto>`, `--json`. Sin argumento usa la carpeta actual si tiene `especificacion.md` |
+| `harness ayuda` | La guía «qué comando uso cuándo», agrupada por momento (igual que `harness -h`) |
 
 ## El asistente
 1. **Qué miré:** cuenta código, manifiestos, SQL, hojas, documentos, `.git` con su historial y un origen declarado (carpeta `origen/` o `[origen] ruta`). Concluye A (hay código, base o historial), B (carpeta vacía o casi vacía, o solo documentos) o C (origen declarado). Si duda (p. ej. solo hay SQL u hojas), **lo pregunta** con su mejor suposición.
@@ -31,4 +34,6 @@ El avance (paso y respuestas) se guarda en `<instancia>/.harness/sesion.json` ap
 Texto plano. Hay color solo si la salida es una terminal, `TERM` no es `dumb` y no existe `NO_COLOR`. Códigos: 0 bien · 1 problema/error · 2 detenido (falta algo; el mensaje dice qué) · 130 interrumpido.
 
 ## Pruebas
-`python3 -m unittest cli/tests/test_cli.py` (usa carpetas temporales; el `input()` se inyecta).
+`python3 -m unittest cli/tests/test_cli.py cli/tests/test_interfaz.py` (usa carpetas temporales; el `input()` se inyecta). `test_interfaz.py` cubre la ayuda por momentos, los errores accionables y `siguiente`, `trazar` y `ayuda`.
+
+Mapa de uso por situación (empresa con estándar propio, centralizado, proyecto nuevo): `docs/MAPA-DE-COMANDOS.md`.

@@ -33,7 +33,7 @@ Problema: {{qué duele y a quién}} · Alcance: {{qué entra}} · Fuera de alcan
 ```
 
 ## Reglas que el guion comprueba
-Todo `RQ` con al menos un `CA`; sin identificadores repetidos; `CA` dentro de su `RQ`; niveles de suposición válidos; sin `{{…}}` sin resolver; sin palabras vagas en criterios (aviso); aprobación marcada antes de delegar; ninguna suposición `abierto` al cerrar.
+Todo `RQ` con al menos un `CA`; sin identificadores repetidos; `CA` dentro de su `RQ`; niveles de suposición válidos; sin `{{…}}` sin resolver; sin palabras vagas en criterios (aviso); aprobación marcada antes de delegar; ninguna suposición `abierto` al delegar ni al cerrar.
 
 ## Ejemplo mínimo
 Ver `plantillas/ejemplos/cambio-ejemplo/especificacion.md`.

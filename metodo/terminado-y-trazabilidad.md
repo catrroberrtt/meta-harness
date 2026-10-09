@@ -18,7 +18,7 @@ Un cambio vive en una carpeta de la instancia (`cambios/<fecha>-<slug>/`) con ar
 | # | Etapa | Entra | Sale (archivo del cambio) | Quién | Puerta para pasar a la siguiente | Cómo se comprueba |
 |---|---|---|---|---|---|---|
 | 1 | Propuesta | Petición de una persona | `apertura.md` (`plantillas/apertura-de-cambio.md`) | Quien propone | Los cuatro puntos completos; fuera de alcance escrito | Lectura (humana) |
-| 2 | Análisis | Apertura, conocimiento previo | `intake.md`, `reutilizacion.md` (`plantillas/intake.md`, `mapa-reutilizacion.md`); suposiciones y desafío en la especificación | Quien analiza | Ninguna suposición **abierta** sin dueño; mapa de reutilización aprobado | `harness trazar --etapa especificacion` (suposiciones) |
+| 2 | Análisis | Apertura, conocimiento previo | `intake.md`, `reutilizacion.md` (`plantillas/intake.md`, `mapa-reutilizacion.md`); suposiciones y desafío en la especificación | Quien analiza | Suposiciones con nivel; las abiertas se resuelven antes de delegar; mapa de reutilización aprobado | `harness trazar --etapa especificacion` (suposiciones) |
 | 3 | Especificación (SDD) | Análisis | `especificacion.md` (`plantillas/especificacion.md`) | Quien especifica | Cada requisito (`RQ-NN`) con ≥1 criterio (`CA-NN.n`); cero palabras vagas sin resolver; **OK explícito** marcado | `harness trazar --etapa especificacion` |
 | 4 | Delegación | Especificación aprobada | `delegacion.md` (`plantillas/delegacion.md`), `plan.md`, `manifiesto.md` | Quien coordina | Cada tarea con encargado, requisitos, archivos que escribe, entrega y aceptación; ningún solape de archivos; todo requisito asignado | `harness trazar --etapa delegacion` |
 | 5 | Implementación | Tarea delegada | Código, pruebas, filas de la matriz en `pendiente`/`implementado` | Encargado | Cada fila de la matriz apunta a su prueba y su commit | `harness trazar --etapa implementacion` |
@@ -26,13 +26,15 @@ Un cambio vive en una carpeta de la instancia (`cambios/<fecha>-<slug>/`) con ar
 | 7 | Verificación | Código revisado | Evidencia (gate con código de salida, consultas con datos) enlazada en la matriz | Quien verifica | Toda fila `verificado` o `no-verificado` con motivo | `harness trazar --etapa cierre` |
 | 8 | Cierre | Matriz completa | `cierre.md` (`plantillas/cierre-de-cambio.md`) | Quien cierra | Cero casillas sin marcar; cada N/A con motivo | `harness trazar --etapa cierre` |
 
+`harness trazar <cambio> --etapa <etapa>` es el atajo de `python3 herramientas/harness-trazabilidad.py`; `harness siguiente` recorre los cambios de la instancia y dice en qué puerta está cada uno.
+
 Cada etapa corresponde a una skill del ciclo (`plantillas/skills/sdd-*`): 1–3 a `sdd-especificar`, 4 a `sdd-planificar`, 5 a `sdd-implementar`, 6–8 a `sdd-verificar`. Las puertas no se saltan; las aprobaciones por fase de `forma-de-trabajo.md` §4–5 siguen en pie.
 
 ## 3. Especificación con identificadores
 
 - **Requisito** `RQ-NN`: una frase con disparador y respuesta («Cuando … el sistema …», «Mientras … el sistema …», «Si … el sistema …»). Los no funcionales también son `RQ` y empiezan por `[no funcional]`.
 - **Criterio de aceptación** `CA-NN.n`: pertenece a su requisito y se escribe en forma Dado / Cuando / Entonces con un **resultado observable** (una cifra, un estado, un código). Palabras como «rápido», «fácil», «adecuado» o «etc.» se resuelven con un número o se convierten en pregunta abierta.
-- **Suposición** `SU-NN` con nivel: `establecido` (verificado, se trata como premisa), `de-trabajo` (se usa como valor por defecto y se avisa al desviarse) o `abierto` (se pregunta antes de decidir). Lo **reconstruido** de un sistema existente (modo `adopt`) entra como `de-trabajo` hasta que una persona lo confirme. Una suposición `abierta` no puede acompañar un cierre.
+- **Suposición** `SU-NN` con nivel: `establecido` (verificado, se trata como premisa), `de-trabajo` (se usa como valor por defecto y se avisa al desviarse) o `abierto` (se pregunta antes de decidir). Lo **reconstruido** de un sistema existente (modo `adopt`) entra como `de-trabajo` hasta que una persona lo confirme. Una suposición `abierta` no puede acompañar la delegación ni el cierre: se resuelve (pasa a `establecido` o `de-trabajo`) o se vuelve pregunta abierta.
 - **Desafío previo** (cambios M y L): tres líneas — cómo falla esto, qué suposición lo rompería, qué se haría entonces. Dos modos bastan: *pre-mortem* (imaginar que ya falló) y *contraargumento* (la mejor alternativa descartada y por qué).
 - **Aprobación**: una casilla `- [x] OK explícito de <persona> (<fecha>)`. Sin ella, la delegación no puede empezar.
 

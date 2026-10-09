@@ -1086,11 +1086,22 @@ class Parser(argparse.ArgumentParser):
         self.exit(2, f"{self.prog}: error: {mensaje}\n{extra}\nQué comando uso cuándo: `harness ayuda`\n")
 
 
+DESCRIPCION_ASISTENTE = ("Asistente del harness (`harness` sin comando): mira la carpeta, detecta el caso (A/B/C), pregunta lo justo "
+                         "y no escribe sin tu confirmación.")
+
+
+class ParserAsistente(Parser):
+    """Ayuda del comando raíz: primero el mapa «qué comando uso cuándo» (por momento) y después las opciones técnicas del asistente.
+
+    Decisión 2026-10-09: quien llega a `harness -h` busca qué comando usar, no la lista de banderas. El significado de los comandos no cambia.
+    """
+
+    def format_help(self):
+        return AYUDA + "\n\n" + DESCRIPCION_ASISTENTE + "\n\nOpciones técnicas del asistente:\n\n" + super().format_help()
+
+
 def parser_asistente():
-    p = Parser(
-        prog="harness", formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Asistente del harness: mira la carpeta, detecta el caso (A/B/C), pregunta lo justo y no escribe sin tu confirmación.",
-        epilog=AYUDA)
+    p = ParserAsistente(prog="harness", formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--carpeta", help="carpeta a mirar (por defecto, la actual)")
     p.add_argument("--si", action="store_true", help="acepta el plan y lo aplica (sin preguntar)")
     p.add_argument("--json", action="store_true", help="salida en JSON (no interactivo)")

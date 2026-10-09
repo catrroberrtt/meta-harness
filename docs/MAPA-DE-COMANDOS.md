@@ -3,7 +3,7 @@
 
 # Qué comando uso cuándo
 
-Una sola entrada, `harness`. La misma ayuda sale con `harness -h` o `harness ayuda`. Regla común: **nada se escribe sin `--aplicar` o sin que respondas «s»**; los comandos de lectura (`estado`, `doctor`, `siguiente`, `trazar`) nunca escriben.
+Una sola entrada, `harness`. La misma ayuda sale con `harness -h` o `harness ayuda` (el mapa por momentos va primero y las opciones técnicas del asistente, después). Regla común: **nada se escribe sin `--aplicar` o sin que respondas «s»**; los comandos de lectura (`estado`, `doctor`, `siguiente`, `trazar`) nunca escriben.
 
 ## 1. Por momento
 

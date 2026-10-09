@@ -37,6 +37,16 @@ class Ayuda(unittest.TestCase):
         pos = [out.index(m) for m in ("1. INSTALAR", "2. ADOPTAR", "3. EMPEZAR", "4. TRABAJAR", "5. VERIFICAR", "6. ACTUALIZAR")]
         self.assertEqual(pos, sorted(pos))
 
+    def test_el_mapa_por_momentos_va_antes_que_las_opciones_tecnicas(self):
+        """Decisión 2026-10-09: `harness -h` y `harness ayuda` muestran primero «qué comando uso cuándo»."""
+        for args in (("-h",), ("ayuda",)):
+            _, out, _ = cli(*args)
+            self.assertTrue(out.startswith("Qué comando uso cuándo"), args)
+            self.assertLess(out.index("1. INSTALAR"), out.index("usage:"))
+            self.assertLess(out.index("6. ACTUALIZAR"), out.index("usage:"))
+            self.assertLess(out.index("6. ACTUALIZAR"), out.index("--carpeta CARPETA"))
+            self.assertEqual(out.count("Qué comando uso cuándo"), 1)
+
     def test_ayuda_equivale_a_h(self):
         c1, o1, _ = cli("ayuda")
         c2, o2, _ = cli("-h")

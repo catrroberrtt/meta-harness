@@ -14,7 +14,7 @@ Un solo comando, con asistente guiado (spec §20). Biblioteca estándar de Pytho
 | `harness estado [instancia]` | Modo, versión, qué hay instalado, qué cambió después y qué quedó pendiente del piso |
 | `harness siguiente [instancia]` | **Dónde estoy y qué sigue** (solo lectura): si la carpeta no es una instancia, qué caso parece y cómo empezar; si lo es, versión, piso pendiente, montaje, sesión sin terminar y el siguiente paso de cada cambio en `cambios/` con su comando. `--json` |
 | `harness trazar [cambio]` | Comprueba la trazabilidad de un cambio (`herramientas/harness-trazabilidad.py`): `--etapa especificacion\|delegacion\|implementacion\|cierre`, `--repo <proyecto>`, `--json`. Sin argumento usa la carpeta actual si tiene `especificacion.md` |
-| `harness ayuda` | La guía «qué comando uso cuándo», agrupada por momento (igual que `harness -h`) |
+| `harness ayuda` | La guía «qué comando uso cuándo», agrupada por momento (igual que `harness -h`). Desde 0.5.0 el mapa por momentos va **primero** y las opciones técnicas del asistente después; ningún comando cambia de significado |
 
 ## El asistente
 1. **Qué miré:** cuenta código, manifiestos, SQL, hojas, documentos, `.git` con su historial y un origen declarado (carpeta `origen/` o `[origen] ruta`). Concluye A (hay código, base o historial), B (carpeta vacía o casi vacía, o solo documentos) o C (origen declarado). Si duda (p. ej. solo hay SQL u hojas), **lo pregunta** con su mejor suposición.

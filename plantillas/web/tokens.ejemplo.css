@@ -1,0 +1,66 @@
+/* Tokens de ejemplo para una web. Empresa inventada: Ejemplo S. A. Valores de muestra: la empresa real pone los suyos.
+   Nombres alineados con los del ERP base (ver plantillas/web/mapa-de-tokens.md). El verificador lee este archivo. */
+:root {
+  --brand-400: #5a95cf;
+  --brand-500: #276eb1;
+  --brand-600: #1f5c96;
+  --brand-700: #184a7b;
+  --brand-800: #123a62;
+  --brand-900: #0c2744;
+  --on-brand: #ffffff;
+
+  --bg: #ffffff;
+  --surface: #f9fafb;
+  --surface-2: #f0f2f4;
+  --border: #d5dadd;
+  --text: #1d2d3e;
+  --muted: #556b82;
+  --focus-ring: #276eb1;
+
+  --tone-ok-bg: #f5fae5;
+  --tone-ok-fg: #256f3a;
+  --tone-warn-bg: #fff8d6;
+  --tone-warn-fg: #a54a00;
+  --tone-danger-bg: #ffeaf4;
+  --tone-danger-fg: #aa0808;
+  --tone-info-bg: #e1f4ff;
+  --tone-info-fg: #0064d9;
+
+  --radius: 0.75rem;
+  --radius-control: 0.5rem;
+  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --max-w: 72rem;
+  --section-gap: 5rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-xl: 1.25rem;
+  --text-4xl: 2.5rem;
+}
+
+:root[data-theme='dark'] {
+  --brand-400: #7fbfff;
+  --brand-500: #4da3ff;
+  --brand-600: #2f8fff;
+  --on-brand: #0c2744;
+  --bg: #11171d;
+  --surface: #1a222a;
+  --surface-2: #202a33;
+  --border: #35424e;
+  --text: #eaecee;
+  --muted: #9aa9b8;
+  --focus-ring: #7fbfff;
+  --tone-ok-bg: #12301d;
+  --tone-ok-fg: #86d79b;
+  --tone-warn-bg: #3a2c05;
+  --tone-warn-fg: #ffc266;
+  --tone-danger-bg: #3d1420;
+  --tone-danger-fg: #ff9db6;
+  --tone-info-bg: #10304d;
+  --tone-info-fg: #99ccff;
+}
+
+/* Pares extra que esta empresa garantiza (el verificador los lee):
+   contraste: --brand-700 sobre --bg >= 4.5
+*/

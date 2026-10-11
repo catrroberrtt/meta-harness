@@ -177,6 +177,14 @@ class Opcionales(Base):
         self.assertTrue(any("integraciones" in a and "no existe" in a for a in p["avisos"]))
 
 
+    def test_codigos_de_barras_senalan_el_diagnostico_sin_asumir_escaneo(self):
+        n = self.negocio("comercio")
+        (n / "almacen.md").write_text("En el almacén usamos pistola y etiquetas con código de barras EAN para recibir la mercadería.\n", encoding="utf-8")
+        p = self.proponer(n)
+        self.assertIn("almacen", self.ids(p))
+        self.assertTrue(any("diagnóstico de códigos" in a for a in p["avisos"]))
+
+
 class Robustez(Base):
     def test_carpeta_vacia_da_solo_el_nucleo_y_lo_dice(self):
         vacia = self.tmp / "vacia"

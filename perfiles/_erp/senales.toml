@@ -101,6 +101,13 @@ modulos = ["almacen-avanzado"]
 terminos = [["picking", 3], ["ubicaciones de almacen", 3], ["wms", 3], ["zonas de almacenamiento", 3], ["reabastecimiento", 2],
             ["putaway", 3]]
 
+[senal.almacen-codigos]
+etiqueta = "Códigos de barras y escaneo en almacén"
+modulos = ["almacen"]
+aviso = "Menciona códigos de barras o escaneo: antes de cargar productos corre el diagnóstico de códigos del almacén (simulación, no escribe) para conservar los EAN válidos y generar solo los que faltan; el escaneo en la recepción se activa por almacén y no se asume."
+terminos = [["codigo de barras", 3], ["codigos de barras", 3], ["ean", 2], ["pistola", 2], ["pistoleo", 3], ["lector de codigos", 3],
+            ["escaner", 2], ["terminal de mano", 3], ["pocket", 2], ["etiquetas", 1]]
+
 [senal.inventario-fisico]
 etiqueta = "Inventario físico"
 modulos = ["inventario-fisico"]

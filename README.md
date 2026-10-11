@@ -50,6 +50,10 @@ Cada cambio recorre la misma cadena (propuesta, análisis, especificación, dele
 
 Esqueleto (0.1.x): estructura, contratos de adaptadores, plantilla de convenciones, `adopt` funcional y dos herramientas genéricas. El resto de documentos llega a cada carpeta solo cuando supera la medición (tipo declarado y especificidad 0).
 
+## Seguridad
+
+Línea base de 20 comprobaciones previas al lanzamiento (`estandares/seguridad-base.md`): **exigida** en sistemas nuevos (entra como requisitos de la especificación) y **solo marcada** en el análisis de un proyecto existente.
+
 <!-- opcion-erp:inicio -->
 ## Opción ERP (estado D)
 

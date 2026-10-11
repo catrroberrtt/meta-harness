@@ -12,3 +12,7 @@ Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia 
 <!-- open-design:inicio -->
 Estándar adicional: `diseno-web.md` (webs públicas: marca y tokens compartidos con el ERP, accesibilidad, privacidad, activos y licencias).
 <!-- open-design:fin -->
+
+<!-- seguridad-base:inicio -->
+Estándar adicional: `seguridad-base.md` (20 comprobaciones previas al lanzamiento): **se exige** en sistemas nuevos y **se marca sin imponer** en el análisis de proyectos existentes.
+<!-- seguridad-base:fin -->

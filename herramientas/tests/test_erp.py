@@ -185,6 +185,25 @@ class Opcionales(Base):
         self.assertTrue(any("diagnóstico de códigos" in a for a in p["avisos"]))
 
 
+class SeguridadBase(Base):
+    def test_sistema_nuevo_exige_los_20_como_requisitos_a_continuacion_de_los_modulos(self):
+        p = self.proponer(self.negocio("comercio"))
+        sb = p["seguridad_base"]
+        self.assertEqual(sb["modo"], "exigida: sistema nuevo")
+        self.assertEqual([r["id"] for r in sb["requisitos"]], [f"SEG-{i:02d}" for i in range(1, 21)])
+        self.assertEqual(sb["requisitos"][0]["requisito"], f"RQ-{len(p['modulos']) + 1:02d}")
+        esp = E.especificacion_md(p)
+        self.assertIn("comprobación de seguridad «Ocultar API keys» (SEG-01)", esp)
+        self.assertIn("«Escanear dependencias» (SEG-20)", esp)
+        self.assertIn("línea base de seguridad (sistema nuevo)", E.matriz_md(p))
+
+    def test_las_filas_de_seguridad_empiezan_pendientes_y_no_se_dan_por_cumplidas(self):
+        p = self.proponer(self.negocio("comercio"))
+        filas = [l for l in E.matriz_md(p).splitlines() if "línea base de seguridad" in l]
+        self.assertEqual(len(filas), 20)
+        self.assertTrue(all("| pendiente |" in l for l in filas))
+
+
 class Robustez(Base):
     def test_carpeta_vacia_da_solo_el_nucleo_y_lo_dice(self):
         vacia = self.tmp / "vacia"
@@ -474,9 +493,9 @@ class Trazabilidad(Base):
             c, d = self.correr(inst / "cambios" / "erp-composicion", "especificacion")
             self.assertEqual(c, 0, (rubro, d))
             self.assertEqual(d["resumen"]["errores"], 0)
-            self.assertEqual(d["resumen"]["requisitos"], len(p["modulos"]))
+            self.assertEqual(d["resumen"]["requisitos"], len(p["modulos"]) + len(p["seguridad_base"]["requisitos"]))
             texto = (inst / "cambios" / "erp-composicion" / "especificacion.md").read_text(encoding="utf-8")
-            self.assertEqual(texto.count("\n- RQ-"), len(p["modulos"]))
+            self.assertEqual(texto.count("\n- RQ-"), len(p["modulos"]) + len(p["seguridad_base"]["requisitos"]))
 
     def test_delegar_exige_resolver_lo_abierto_y_el_ok(self):
         inst, p = self.tmp / "inst", self.proponer(self.negocio("comercio"))
@@ -489,7 +508,7 @@ class Trazabilidad(Base):
         p = self.proponer(self.negocio("comercio"))
         matriz = E.matriz_md(p)
         filas = [l for l in matriz.splitlines() if l.startswith("| RQ-")]
-        self.assertEqual(len(filas), len(p["modulos"]))
+        self.assertEqual(len(filas), len(p["modulos"]) + len(p["seguridad_base"]["requisitos"]))
         compras = next(l for l in filas if "señal compras" in l)
         self.assertIn("descripcion.md:", compras)
         self.assertIn("catálogo: en_construccion", compras)

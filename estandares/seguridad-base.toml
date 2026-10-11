@@ -1,0 +1,179 @@
+# Línea base de seguridad: 20 comprobaciones que se piden ANTES de lanzar una aplicación.
+# Dos usos, dos fuerzas distintas:
+#   · Sistema NUEVO (harness erp / init): se EXIGE; cada ítem entra como requisito con su criterio y su evidencia.
+#   · Proyecto EXISTENTE (adopt): se MARCA, sin imponer; el análisis dice qué evidencia hay y qué no se pudo ver.
+# Los detectores son estáticos (leen archivos): «sin evidencia» NO es «no está», es «no lo vi». Los ítems que solo
+# se confirman en ejecución llevan verificable = false y siempre salen como «confirmar».
+# tipos de señal: archivo (regex sobre la ruta), contenido (regex sobre el texto de código/config/CI),
+#                 alerta (regex sobre el texto: si aparece, es un hallazgo a revisar, no una evidencia).
+version = 1
+
+[[item]]
+id = "SEG-01"
+titulo = "Ocultar API keys"
+que = "Ninguna clave, token o contraseña vive en el código ni llega al navegador; salen de variables de entorno o de un gestor de secretos."
+exigencia = "Las claves se leen del entorno; el repositorio trae un archivo de ejemplo sin valores y el real está ignorado por git."
+verificable = true
+ignorado = ['(^|/)\.env($|\.)', '\.env']
+alerta = ['(?i)(api[_-]?key|secret|token|passw(or)?d)["\x27]?\s*[:=]\s*["\x27][A-Za-z0-9_\-/+=]{16,}["\x27]', 'AKIA[0-9A-Z]{16}', 'sk_live_[0-9A-Za-z]{10,}', '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----']
+
+[[item]]
+id = "SEG-02"
+titulo = "Eliminar secretos de Git"
+que = "Ningún secreto está en el historial; un escáner de secretos corre al confirmar o en integración continua."
+exigencia = "Escáner de secretos configurado (pre-commit o CI) y ningún archivo de entorno real versionado."
+verificable = true
+archivo = ['(^|/)\.gitleaks\.toml$', '(^|/)\.pre-commit-config\.yaml$', '(^|/)\.secrets\.baseline$']
+contenido = ['(?i)gitleaks', '(?i)trufflehog', '(?i)detect-secrets', '(?i)git-secrets']
+versionados = ['(^|/)\.env$', '(^|/)\.env\.(local|production|prod)$']
+
+[[item]]
+id = "SEG-03"
+titulo = "Clave pública para la base de datos"
+que = "Al navegador solo llegan claves públicas de permisos mínimos; la clave de servicio o la cadena de conexión nunca salen del servidor."
+exigencia = "Ninguna cadena de conexión ni clave de servicio en código o configuración del frontend."
+verificable = true
+alerta_en = ['(^|/)(frontend|web|client|app|src/app)/']
+alerta = ['(?i)service[_-]?role', '(?i)postgres(ql)?://[^\s"\x27]+:[^\s"\x27]+@', '(?i)mongodb(\+srv)?://[^\s"\x27]+:[^\s"\x27]+@', '(?i)mysql://[^\s"\x27]+:[^\s"\x27]+@']
+
+[[item]]
+id = "SEG-04"
+titulo = "Seguridad por fila (RLS o equivalente)"
+que = "Cada persona solo alcanza las filas que le corresponden, garantizado en la base o en una capa de servicio única, no solo en la pantalla."
+exigencia = "Políticas por fila en la base, o una capa de servicio que filtra por propietario/organización en toda consulta, con pruebas."
+verificable = false
+contenido = ['(?i)enable row level security', '(?i)create policy', '(?i)force row level security']
+
+[[item]]
+id = "SEG-05"
+titulo = "Encriptar datos sensibles"
+que = "Los datos sensibles se cifran en reposo (campo o disco) y en tránsito; las claves de cifrado no viajan con los datos."
+exigencia = "Datos personales y secretos de integración cifrados en reposo con clave gestionada fuera de la base."
+verificable = false
+contenido = ['(?i)createCipheriv', '(?i)aes-256', '(?i)pgcrypto', '(?i)\bkms\b', '(?i)libsodium', '(?i)Fernet', '(?i)secretbox']
+
+[[item]]
+id = "SEG-06"
+titulo = "Forzar la autenticación"
+que = "Toda ruta que toca datos exige sesión válida; lo público es una lista corta y explícita."
+exigencia = "Guardia de autenticación global por defecto; las rutas públicas se declaran una por una."
+verificable = true
+contenido = ['(?i)AuthGuard', '(?i)UseGuards', '(?i)passport', '(?i)jsonwebtoken|@nestjs/jwt|jose', '(?i)authenticate', '(?i)requireAuth|login_required']
+
+[[item]]
+id = "SEG-07"
+titulo = "Restringir el acceso a registros"
+que = "Además de estar autenticado, hay que tener permiso sobre ese registro concreto (rol, propietario u organización)."
+exigencia = "Permiso por acción y verificación de pertenencia en el servidor, con pruebas de acceso cruzado."
+verificable = false
+contenido = ['(?i)PermissionGuard|RolesGuard|RequierePermiso|@Roles\(', '(?i)\bcan\(|ability|casl', '(?i)owner_id|organization_id|tenant_id|usuario_id\s*=']
+
+[[item]]
+id = "SEG-08"
+titulo = "Bloquear manipulación de campos"
+que = "El servidor acepta solo los campos declarados; no se pueden escribir campos internos (rol, saldo, propietario) desde el cuerpo de la petición."
+exigencia = "Validación con lista blanca de campos y rechazo de los no declarados."
+verificable = true
+contenido = ['(?i)forbidNonWhitelisted|whitelist\s*:\s*true', '(?i)\.strict\(\)', '(?i)additionalProperties\s*:\s*false', '(?i)extra\s*=\s*["\x27]forbid["\x27]']
+
+[[item]]
+id = "SEG-09"
+titulo = "Proteger las cookies de sesión"
+que = "Las cookies de sesión llevan HttpOnly, Secure y SameSite; el token no queda en el almacenamiento accesible por scripts si se puede evitar."
+exigencia = "Cookies con HttpOnly, Secure y SameSite configuradas, o sesión por cabecera con almacenamiento de corta vida y rotación."
+verificable = false
+contenido = ['(?i)httpOnly', '(?i)sameSite', '(?i)secure\s*:\s*true', '(?i)SESSION_COOKIE_(SECURE|HTTPONLY|SAMESITE)']
+
+[[item]]
+id = "SEG-10"
+titulo = "Hashear contraseñas"
+que = "Las contraseñas se guardan con un algoritmo lento y con sal (argon2, bcrypt o scrypt), nunca en claro ni con hash rápido."
+exigencia = "argon2/bcrypt/scrypt con costo configurable y comparación en tiempo constante."
+verificable = true
+contenido = ['(?i)argon2', '(?i)bcrypt', '(?i)scrypt', '(?i)pbkdf2']
+alerta = ['(?i)createHash\(\s*["\x27]md5["\x27]', '(?i)createHash\(\s*["\x27]sha1["\x27]']
+
+[[item]]
+id = "SEG-11"
+titulo = "Límite de intentos (rate limiting)"
+que = "Los accesos, los cambios de contraseña y las rutas costosas tienen tope por persona y por IP."
+exigencia = "Limitación de tasa global y más estricta en acceso; bloqueo temporal tras fallos repetidos."
+verificable = true
+contenido = ['(?i)@nestjs/throttler', '(?i)express-rate-limit', '(?i)rate[-_ ]?limit', '(?i)limit_req', '(?i)slowapi', '(?i)intentos_fallidos|failed_attempts|MAX_INTENTOS']
+
+[[item]]
+id = "SEG-12"
+titulo = "Protección contra bots"
+que = "Los formularios abiertos (registro, contacto, recuperación) tienen desafío o verificación contra automatización."
+exigencia = "Verificación anti-bot en formularios públicos, con alternativa accesible."
+verificable = false
+contenido = ['(?i)recaptcha', '(?i)hcaptcha', '(?i)turnstile', '(?i)captcha']
+
+[[item]]
+id = "SEG-13"
+titulo = "Parametrizar las consultas"
+que = "Ningún dato del usuario se concatena en el texto de una consulta; siempre van como parámetros."
+exigencia = "Consultas parametrizadas u ORM; prohibida la interpolación de entradas en SQL."
+verificable = true
+contenido = ['(?i)typeorm|prisma|sequelize|sqlalchemy|knex|drizzle|mikro-orm', '\$\d+\b', '(?i)cursor\.execute\([^,)]+,\s*[\[(]']
+alerta_excluye = ['(^|/)migrations?/', '(^|/)migraciones/']
+nota_alerta = "Interpolación dentro de una consulta: revisar que lo interpolado sea una estructura fija (nombres, fragmentos con $1) y nunca un dato de la persona."
+alerta = ['(?i)\.(query|execute|raw)\(\s*`[^`]*\$\{', '(?i)\.(query|execute)\(\s*["\x27][^"\x27]*["\x27]\s*\+']
+
+[[item]]
+id = "SEG-14"
+titulo = "Validar las entradas"
+que = "Todo dato que entra (cuerpo, parámetros, cabeceras, archivos) se valida en el servidor por tipo, largo y forma."
+exigencia = "Esquema de validación por cada entrada del servidor, con límites de largo y rangos."
+verificable = true
+contenido = ['(?i)class-validator', '(?i)\bzod\b', '(?i)\bjoi\b', '(?i)\byup\b', '(?i)pydantic', '(?i)\bajv\b', '(?i)ValidationPipe']
+
+[[item]]
+id = "SEG-15"
+titulo = "Sanitizar el contenido"
+que = "Lo que una persona escribe y otra ve se escapa o se limpia antes de mostrarse; no se inserta HTML sin tratar."
+exigencia = "Escape por defecto del framework; si se admite HTML, limpieza con lista blanca."
+verificable = true
+contenido = ['(?i)dompurify', '(?i)sanitize-html', '(?i)bleach', '(?i)escape[-_ ]?html']
+alerta = ['bypassSecurityTrust(Html|Script|Url|ResourceUrl)', '(?i)dangerouslySetInnerHTML', '\.innerHTML\s*=']
+
+[[item]]
+id = "SEG-16"
+titulo = "Restringir los archivos"
+que = "Los archivos subidos se limitan por tipo real, tamaño y destino; no se ejecutan ni se sirven desde el mismo origen sin control."
+exigencia = "Lista blanca de tipos verificados por contenido, tope de tamaño y almacenamiento fuera de la raíz pública."
+verificable = true
+contenido = ['(?i)multer', '(?i)fileFilter', '(?i)limits\s*:\s*\{[^}]*fileSize', '(?i)magic[ -]?bytes|file-type|mime-types', '(?i)max[_-]?file[_-]?size']
+
+[[item]]
+id = "SEG-17"
+titulo = "Devolver solo los datos necesarios"
+que = "Las respuestas llevan únicamente lo que la pantalla necesita; nada de hashes, campos internos ni filas de otras personas."
+exigencia = "Modelos de respuesta explícitos (nunca la entidad completa) y pruebas de que no filtran campos internos."
+verificable = false
+contenido = ['(?i)ClassSerializerInterceptor', '(?i)@Exclude\(', '(?i)response[_-]?model', '(?i)\bSerializer\b', '(?i)Dto\b']
+
+[[item]]
+id = "SEG-18"
+titulo = "Cabeceras de seguridad"
+que = "El servidor envía cabeceras que limitan el daño del navegador: CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy."
+exigencia = "Cabeceras de seguridad activas en toda respuesta, con CSP restrictiva."
+verificable = false
+contenido = ['(?i)\bhelmet\b', '(?i)Content-Security-Policy', '(?i)X-Frame-Options', '(?i)X-Content-Type-Options', '(?i)add_header\s+X-']
+
+[[item]]
+id = "SEG-19"
+titulo = "Forzar HTTPS"
+que = "Todo el tráfico va cifrado; HTTP redirige a HTTPS y se declara HSTS."
+exigencia = "Redirección a HTTPS y HSTS en el borde (balanceador, proxy o servidor)."
+verificable = false
+contenido = ['(?i)Strict-Transport-Security', '(?i)\bhsts\b', '(?i)redirect.*https', '(?i)force[_-]?https|ssl_redirect|SECURE_SSL_REDIRECT']
+
+[[item]]
+id = "SEG-20"
+titulo = "Escanear dependencias"
+que = "Las dependencias se revisan contra vulnerabilidades conocidas de forma automática y periódica."
+exigencia = "Escaneo de dependencias en integración continua o bot de actualización, con umbral que frene lo crítico."
+verificable = true
+archivo = ['(^|/)\.github/dependabot\.ya?ml$', '(^|/)renovate\.json5?$', '(^|/)\.snyk$']
+contenido = ['(?i)npm audit', '(?i)pip-audit', '(?i)osv-scanner', '(?i)\btrivy\b', '(?i)\bsnyk\b', '(?i)dependabot', '(?i)cargo audit', '(?i)govulncheck']

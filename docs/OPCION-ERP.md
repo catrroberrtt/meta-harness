@@ -40,6 +40,12 @@ Datos editables, sin código: `perfiles/_erp/senales.toml` (o el archivo que pas
 - No genera el contenido del perfil de configuración (solo sugiere su nombre; el módulo `perfiles-configuracion` del ERP está planeado).
 - No sabe de multiempresa ni de datos reales del negocio (cifras, clientes): solo de qué procesos habla.
 
+## Línea base de seguridad (exigida en sistemas nuevos)
+
+Un ERP nuevo nace con la línea base de `estandares/seguridad-base.md`: `propuesta-erp.json` trae `seguridad_base` y la
+especificación y la matriz suman **20 requisitos** (`RQ-NN`, a continuación de los módulos) con su criterio, todos
+`pendiente` hasta que haya evidencia enlazada. No aplica al análisis de un proyecto existente (`adopt`), donde solo se marca.
+
 ## Contrato con el compositor
 
 `erp/propuesta-erp.json` trae, además de todo lo explicado para la persona, el objeto **`entrega_al_compositor`** (esquema `meta-harness/entrega-compositor@1`): es lo que se le entregará.

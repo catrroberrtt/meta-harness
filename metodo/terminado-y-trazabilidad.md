@@ -90,6 +90,7 @@ Para texto que se publica (PR, ticket, página) sigue vigente el revisor indepen
 | Suposiciones abiertas | Guion |
 | Tareas delegadas aceptadas | Guion |
 | Cero casillas sin marcar, cada N/A con motivo | Guion |
+| Sistema nuevo: las 20 filas de la línea base de seguridad con evidencia enlazada (`estandares/seguridad-base.md`); en un proyecto existente solo se marca | Guion (filas `pendiente` no cierran) |
 | Gate ejecutado, con código de salida pegado | Persona (el guion exige el archivo de evidencia) |
 | Revisión de dos etapas hecha por otra persona | Persona |
 | Capas completas, documentación y tickets al día con enlaces completos | Persona |

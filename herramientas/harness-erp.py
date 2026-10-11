@@ -436,6 +436,7 @@ def proponer(docs, no_leidos, avisos_lectura, cfg, cat, ev, marca_en_instancia=N
         "entrega_al_compositor": entrega,
     }
     p["trazabilidad"] = trazabilidad(p)
+    p["seguridad_base"] = seguridad_base_exigida(len(p["trazabilidad"]))
     return p
 
 
@@ -458,6 +459,21 @@ def trazabilidad(p):
         filas.append({"requisito": f"RQ-{n:02d}", "modulo": m["id"], "justificacion": just,
                       "evidencia": f"{ev['archivo']}:{ev['linea']}" if ev else None, "estado_catalogo": m["estado"], "fase": m["fase"]})
     return filas
+
+
+def seguridad_base_exigida(n_previos):
+    """Sistema NUEVO: la línea base de seguridad (estandares/seguridad-base.toml) entra como requisitos, a continuación de los
+    módulos. En un proyecto existente (adopt) no se exige: solo se marca. Sin el catálogo el comando sigue, y lo dice."""
+    ruta = RAIZ / "herramientas" / "seguridad_base.py"
+    try:
+        esp = importlib.util.spec_from_file_location("seguridad_base", ruta)
+        mod = importlib.util.module_from_spec(esp)
+        esp.loader.exec_module(mod)
+        reqs = mod.requisitos()
+    except Exception as e:
+        return {"modo": "no disponible", "error": str(e)[:200], "requisitos": []}
+    filas = [{"requisito": f"RQ-{n_previos + k:02d}", **r} for k, r in enumerate(reqs, 1)]
+    return {"modo": "exigida: sistema nuevo", "fuente": "estandares/seguridad-base.toml", "requisitos": filas}
 
 
 # ------------------------------------------------------------------ salidas legibles
@@ -609,6 +625,11 @@ def especificacion_md(p):
             motivo = "lo requiere " + ", ".join(f"`{x}`" for x in m["requerido_por"])
         L.append(f"- {t['requisito']} · Cuando se componga la instalación, el sistema incluirá el módulo «{m['nombre']}» (`{m['id']}`), porque {motivo}.")
         L.append(f"  - CA-{t['requisito'][3:]}.1 · Dado el producto propuesto, cuando el compositor del ERP resuelve la lista de módulos, entonces `erp.lock.json` incluye `{m['id']}` con el estado «{m['estado']}» del catálogo.")
+    sb = p.get("seguridad_base") or {}
+    for r in sb.get("requisitos", []):
+        L.append(f"- {r['requisito']} · El sistema nuevo cumplirá la comprobación de seguridad «{r['titulo']}» ({r['id']}): {r['que']}")
+        num = r["requisito"][3:]
+        L.append(f"  - CA-{num}.1 · Dado el sistema construido, cuando se revisa la comprobación {r['id']}, entonces hay evidencia enlazada (archivo, prueba o configuración) de que: {r['exigencia']}")
     L += ["", "## Desafío previo (M y L)", "",
           "- Cómo falla esto: se compone un módulo que solo está planeado y la instalación sale sin él, sin que la persona lo note.",
           "- Qué suposición lo rompería: " + (next((f"SU-{k:02d}" for k, l in enumerate(sus, 1) if " abierto " in l), "SU-01")) + ".",
@@ -635,6 +656,10 @@ def matriz_md(p):
         else:
             sen = "núcleo"
         L.append(f"| {t['requisito']} | CA-{num}.1 | erp.lock.json lo lista (lo comprueba el compositor, aún no existe) | n/a | - | - | pendiente | {_c(sen)}; catálogo: {m['estado']} |")
+    for r in (p.get("seguridad_base") or {}).get("requisitos", []):
+        num = r["requisito"][3:]
+        como = "se verifica leyendo código y configuración" if r["verificable_leyendo"] else "se confirma en ejecución (no basta leer el código)"
+        L.append(f"| {r['requisito']} | CA-{num}.1 | {_c(r['id'] + ': ' + r['titulo'])} | - | - | - | pendiente | línea base de seguridad (sistema nuevo); {_c(como)} |")
     L.append("")
     return "\n".join(L)
 

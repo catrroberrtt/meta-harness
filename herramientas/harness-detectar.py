@@ -18,6 +18,15 @@ EXT_COD = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".py", ".java", ".go", ".rb", "
 MAX_ARCH, MAX_LEER = 40_000, 400_000
 
 
+def _cargar_seguridad_base():
+    import importlib.util
+    ruta = pathlib.Path(__file__).resolve().parent / "seguridad_base.py"
+    esp = importlib.util.spec_from_file_location("seguridad_base", ruta)
+    mod = importlib.util.module_from_spec(esp)
+    esp.loader.exec_module(mod)
+    return mod
+
+
 def analizar(root):
     ROOT = pathlib.Path(root).expanduser().resolve()
 
@@ -52,6 +61,9 @@ def analizar(root):
             except Exception:
                 _c[k] = ""
         return _c[k]
+
+    def leer_archivo_completo(p):
+        return leer(p, 300_000)
 
     def hay(*nombres):
         return [n for n in nombres if n in FS]
@@ -692,6 +704,14 @@ def analizar(root):
         falta(D8, "No se registran decisiones de arquitectura (ADR)")
         prop(D8, "Un ADR corto por decisión relevante en docs/decisiones/")
     R["dimensiones"] = [D1, D2, D3, D4, D5, D6, D7, D8]
+
+    # ---- línea base de seguridad: INFORMATIVA (no se impone a un proyecto existente; solo se marca qué se ve y qué no)
+    try:
+        sb = _cargar_seguridad_base()
+        R["seguridad_base"] = sb.evaluar(sorted(FS), leer_archivo_completo, versionados=sb.versionados_git(ROOT) if es_git else None)
+        R["seguridad_base"]["modo"] = "informativo: no se exige en proyectos existentes"
+    except Exception as e:  # el análisis nunca se cae por esto
+        R["seguridad_base"] = {"modo": "no disponible", "error": str(e)[:200], "items": [], "resumen": {}}
     for dim in R["dimensiones"]:
         for q in dim["pregunta"]:
             assert q["intento"]
@@ -710,6 +730,17 @@ def md(R):
         o.append("**Falta**\n" + ("\n".join(f"- {x}" for x in dim["falta"]) or "- (nada que marcar)") + "\n")
         o.append("**Propuesta**\n" + ("\n".join(f"- {x}" for x in dim["propuesta"]) or "- (sin cambios: lo detectado cubre el piso)") + "\n")
         o.append("**Pregunta**\n" + ("\n".join(f"- {x['pregunta']} _Intentado: {x['intento']}._" for x in dim["pregunta"]) or "- (ninguna: todo se pudo detectar)") + "\n")
+    sb = R.get("seguridad_base") or {}
+    if sb.get("items"):
+        o.append("## Línea base de seguridad (informativa)\n")
+        o.append("_No se exige a un proyecto existente: se marca qué evidencia hay para que el equipo decida. «Sin evidencia» es «no lo vi leyendo archivos», no «no está»; «confirmar» solo se comprueba en ejecución._\n")
+        marca = {"evidencia": "evidencia", "indicios": "indicios (confirmar)", "sin_evidencia": "sin evidencia", "confirmar": "confirmar", "alerta": "ALERTA: revisar"}
+        o.append("| Id | Comprobación | Estado | Evidencia o alerta |\n|---|---|---|---|")
+        for r in sb["items"]:
+            det = "; ".join(r["alertas"] or r["evidencia"]) or "—"
+            o.append(f"| {r['id']} | {r['titulo']} | {marca[r['estado']]} | {det.replace('|', '/')} |")
+        notas = sorted({r["nota"] for r in sb["items"] if r.get("nota")})
+        o.append("\n" + "\n".join(f"- {n}" for n in notas) + ("\n" if notas else ""))
     return "\n".join(o)
 
 

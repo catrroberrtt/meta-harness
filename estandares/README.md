@@ -16,3 +16,7 @@ Estándar adicional: `diseno-web.md` (webs públicas: marca y tokens compartidos
 <!-- seguridad-base:inicio -->
 Estándar adicional: `seguridad-base.md` (20 comprobaciones previas al lanzamiento): **se exige** en sistemas nuevos y **se marca sin imponer** en el análisis de proyectos existentes.
 <!-- seguridad-base:fin -->
+
+<!-- guia-usuario:inicio -->
+Estándar adicional: `guia-al-usuario.md` (textos, estados vacíos que orientan, primer uso con datos de ejemplo y primera carga de gráficos): **se exige** en sistemas nuevos y **se marca** en proyectos existentes.
+<!-- guia-usuario:fin -->

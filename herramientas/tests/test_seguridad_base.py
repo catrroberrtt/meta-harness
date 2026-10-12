@@ -56,7 +56,7 @@ class Evaluar(unittest.TestCase):
         self.assertEqual(r["SEG-10"]["estado"], "evidencia")
 
     def test_secreto_en_codigo_es_alerta(self):
-        r = evaluar({"src/cfg.ts": "const apiKey = 'abcdef0123456789abcdef0123';\n"})
+        r = evaluar({"src/cfg.ts": "const apiKey = 'abcdef0123456789abcdef0123';\n"})  # escaneo-publico: ignorar (dato falso de prueba)
         self.assertEqual(r["SEG-01"]["estado"], "alerta")
         self.assertIn("src/cfg.ts:1", r["SEG-01"]["alertas"][0])
 
@@ -68,7 +68,7 @@ class Evaluar(unittest.TestCase):
         self.assertNotEqual(evaluar(arch, versionados=None)["SEG-02"]["estado"], "alerta")
 
     def test_las_pruebas_y_los_md_no_generan_alertas(self):
-        r = evaluar({"src/a.spec.ts": "const apiKey = 'abcdef0123456789abcdef0123';", "docs/x.md": "AKIAABCDEFGHIJKLMNOP"})
+        r = evaluar({"src/a.spec.ts": "const apiKey = 'abcdef0123456789abcdef0123';", "docs/x.md": "AKIAABCDEFGHIJKLMNOP"})  # escaneo-publico: ignorar (dato falso de prueba)
         self.assertNotEqual(r["SEG-01"]["estado"], "alerta")
 
     def test_consulta_concatenada_es_alerta_y_la_migracion_no(self):

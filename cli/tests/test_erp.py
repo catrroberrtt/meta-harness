@@ -30,6 +30,16 @@ class Base(unittest.TestCase):
         self.negocio = F.escribir_negocio(self.tmp / "docs-negocio", "comercio")
         self.inst = self.tmp / "instancia"
         self.inst.mkdir()
+        # El registro de fuentes del usuario no debe influir en las pruebas: se apunta a un archivo que no existe.
+        self.viejo_registro = os.environ.get("HARNESS_FUENTES")
+        os.environ["HARNESS_FUENTES"] = str(self.tmp / "fuentes.toml")
+        self.addCleanup(self._restaurar_registro)
+
+    def _restaurar_registro(self):
+        if self.viejo_registro is None:
+            os.environ.pop("HARNESS_FUENTES", None)
+        else:
+            os.environ["HARNESS_FUENTES"] = self.viejo_registro
 
     def erp_cmd(self, *args, respuestas=(), interactivo=False):
         ent = Entrada(respuestas)
@@ -80,6 +90,20 @@ class Entradas(Base):
         c, out, _ = self.erp_cmd("--negocio", self.negocio)
         self.assertEqual(c, 2)
         self.assertIn("--erp-base", out)
+
+    def test_usa_el_erp_registrado_si_no_se_indica(self):
+        self.assertEqual(hc.main(["aprender", "fuentes", "agregar", "erp-base", str(self.erp), "--tipo", "erp"], salida=StringIO()), 0)
+        c, out, _ = self.erp_cmd("--negocio", self.negocio)
+        self.assertEqual(c, 0, out)
+        self.assertIn("Uso el ERP estándar registrado", out)
+
+    def test_un_erp_base_explicito_gana_al_registrado(self):
+        otro = self.tmp / "otro"
+        otro.mkdir()
+        self.assertEqual(hc.main(["aprender", "fuentes", "agregar", "erp-base", str(otro), "--tipo", "erp"], salida=StringIO()), 0)
+        c, out, _ = self.erp_cmd(*self.comun())
+        self.assertEqual(c, 0, out)
+        self.assertNotIn("Uso el ERP estándar registrado", out)
 
     def test_una_respuesta_que_parece_secreto_se_descarta(self):
         c, out, _ = self.erp_cmd("--erp-base", self.erp, respuestas=["password=abcdef"], interactivo=True)

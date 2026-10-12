@@ -27,7 +27,7 @@ import tomllib
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "erp", "ayuda")
+SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "erp", "aprender", "ayuda")
 IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__", ".harness", "dist", "build", ".idea", ".vscode"}
 CODIGO_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs", ".kt", ".swift",
               ".c", ".cpp", ".h", ".scala", ".vue", ".sh", ".dart", ".lua"}
@@ -869,6 +869,33 @@ def cmd_trazar(a, out, raiz):
     return r.returncode
 
 
+def erp_base_registrado(raiz):
+    """Ruta del ERP estándar registrado como fuente (herramientas/harness-aprender.py); None si no hay."""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("harness_aprender_reg", Path(raiz) / "herramientas" / "harness-aprender.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.erp_base_registrado()
+    except Exception:
+        return None
+
+
+def cmd_aprender(a, out, raiz):
+    """Delega en herramientas/harness-aprender.py (fuentes, escanear, listar, ver, descartar, promover). No sube nada."""
+    herramienta = Path(raiz) / "herramientas" / "harness-aprender.py"
+    if not herramienta.is_file():
+        raise Detener(f"No encuentro {herramienta}. Actualiza el harness (`harness update`) o indica la raíz con --harness.", 2)
+    args = list(a.args or [])
+    if args and args[0] == "--":
+        args = args[1:]
+    if not args:
+        args = ["listar"]
+    r = correr([sys.executable, herramienta, *args])
+    out.p((r.stdout + r.stderr).rstrip())
+    return r.returncode
+
+
 # ------------------------------------------------------------------ instalar / update
 DESCARGADORES = []
 """PUNTO DE EXTENSION de la descarga remota (otro agente). Cada elemento es una funcion `f(origen: str) -> Path | None`
@@ -1068,7 +1095,9 @@ def cmd_erp(a, out, raiz, entrada=None, interactivo=False):
         negocio = Path(negocio).expanduser().resolve()
         if not negocio.is_dir():
             raise Detener(f"No existe la carpeta de documentos {negocio}.\nIndica una carpeta local con los documentos del negocio.", 2)
-        erp_base = a.erp_base
+        erp_base = a.erp_base or erp_base_registrado(raiz)
+        if erp_base and not a.erp_base:
+            out.p(f"Uso el ERP estándar registrado: {erp_base} (se cambia con `harness aprender fuentes`).")
         if not erp_base:
             if not interactivo:
                 raise Detener("Falta indicar dónde está el ERP estándar: `--erp-base <ruta>` (la carpeta del repositorio del ERP; solo se lee su `modulos/catalogo.json`).", 2)
@@ -1158,6 +1187,10 @@ AYUDA = """Qué comando uso cuándo (mapa completo: docs/MAPA-DE-COMANDOS.md)
   6. ACTUALIZAR
        harness update [instancia]               muestra el plan; con --aplicar escribe
        harness montar [instancia]               entorno de los agentes; con --aplicar escribe
+  7. APRENDER (lo que se aprende en un proyecto no se repite en el siguiente)
+       harness aprender fuentes agregar <nombre> <ruta> --tipo erp|instancia   registra de dónde aprender (solo lectura)
+       harness aprender escanear                separa lo general de lo del negocio y arma la cola
+       harness aprender listar | ver <id> | descartar <id> --motivo ... | promover <id> --tipo estandar [--aplicar]
 
 Nada se escribe sin --aplicar o sin responder «s» a la confirmación. Cada comando acepta -h.
 Códigos de salida: 0 bien · 1 problema o error · 2 detenido (falta algo; el mensaje dice qué) · 130 interrumpido."""
@@ -1171,6 +1204,7 @@ EJEMPLOS = {
     "siguiente": "harness siguiente\n  harness siguiente ./mi-instancia --json",
     "erp": "harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base              (solo muestra la propuesta)\n  harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base --instancia ./mi-instancia --aplicar",
     "trazar": "harness trazar cambios/2026-01-10-entregas-parciales\n  harness trazar cambios/2026-01-10-entregas-parciales --etapa delegacion\n  harness trazar cambios/2026-01-10-entregas-parciales --repo ./mi-proyecto",
+    "aprender": "harness aprender fuentes agregar erp-base ./erp-base --tipo erp\n  harness aprender escanear\n  harness aprender listar\n  harness aprender promover <id> --tipo estandar --aplicar",
 }
 DESCRIPCION = {
     "instalar": "Instala una instancia: carpeta local o repositorio (https://, ssh://, git@host:ruta u owner/nombre).",
@@ -1180,6 +1214,7 @@ DESCRIPCION = {
     "estado": "Muestra modo, versión, qué hay instalado, qué cambió después y qué falta del piso.",
     "siguiente": "Dónde estoy y qué sigue: estado de la carpeta o instancia y pasos sugeridos, en orden. Solo lectura.",
     "trazar": "Comprueba la trazabilidad de un cambio (especificación, delegación, matriz, cierre). Solo lectura.",
+    "aprender": "Aprendizaje: registra fuentes (un ERP central, una instancia), separa lo general de lo del negocio y deja una cola de aportes para revisar. Nunca sube nada.",
     "erp": "Opción ERP: lee los documentos del negocio (archivos locales), propone producto y módulos del ERP estándar con su estado real y, solo si confirmas, deja la propuesta en la instancia. No instala ni copia nada del ERP.",
 }
 TRADUCCIONES = (("the following arguments are required: ", "falta indicar: "), ("unrecognized arguments: ", "argumentos no reconocidos: "),
@@ -1315,6 +1350,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             p.add_argument("--si", action="store_true", help="igual que --aplicar")
             p.add_argument("--no-interactivo", action="store_true", help="no pregunta: muestra la propuesta y sale sin escribir")
             p.add_argument("--json", action="store_true", help="una sola salida JSON (no interactivo)")
+        elif sub == "aprender":
+            p.add_argument("args", nargs=argparse.REMAINDER, help="acción y argumentos de harness-aprender.py (fuentes, escanear, listar, ver, descartar, promover)")
         elif sub == "ayuda":
             pass
         else:
@@ -1332,6 +1369,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             return cmd_montar(a, out, raiz)
         if sub == "trazar":
             return cmd_trazar(a, out, raiz)
+        if sub == "aprender":
+            return cmd_aprender(a, out, raiz)
         if sub == "erp":
             inter = interactivo if interactivo is not None else (sys.stdin.isatty() and sys.stdout.isatty())
             inter = bool(inter) and not (a.no_interactivo or a.json)

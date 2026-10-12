@@ -1,6 +1,6 @@
 # Aprendizaje: qué sube al harness y qué se queda en la instancia
 <!-- tipo: metodo · capa: 1 -->
-<!-- revisado: 2026-10-07 · vence: 90d · fuente: método de aprendizaje del repositorio -->
+<!-- revisado: 2026-10-12 · vence: 90d · fuente: método de aprendizaje del repositorio -->
 
 El harness es el repositorio que más conocimiento reutilizable concentra. Cuando una instancia (un proyecto concreto) aprende algo, hay que decidir si eso sirve a cualquier proyecto o solo a ese. Este documento fija el camino, y `herramientas/harness-aportar.py` lo aplica de forma explicable. La herramienta propone; **nunca sube nada por sí misma**.
 
@@ -56,3 +56,9 @@ La instancia fija la versión que usa en `harness.lock`. El comando `update` com
 ## Límites
 
 La clasificación es un filtro de seguridad, no un juicio. Sin `dominio.txt` no ve el negocio que no se nombra con cifras; una regla de negocio escrita en lenguaje corriente puede parecer técnica. Siempre la revisa una persona antes de subir.
+
+## 8. Automático: `harness aprender`
+
+Los pasos 1 a 5 de arriba se encadenan solos hasta la revisión: `harness aprender escanear` lee las fuentes registradas (un ERP central,
+la instancia de una empresa), parte cada documento por secciones, clasifica cada una con la regla de la sección 2 y deja las generales,
+anonimizadas, en una cola fuera del repositorio. **Revisar y promover sigue siendo humano.** Guía completa: `docs/APRENDIZAJE-AUTOMATICO.md`.

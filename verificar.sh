@@ -31,14 +31,19 @@ done
 paso "4. frescura de documentos"
 python3 herramientas/harness-frescura.py || mal "harness-frescura"
 
-paso "5. referencias prohibidas (.prohibidos.txt)"
-if [ -f .prohibidos.txt ]; then
-  PAT=$(grep -v '^\s*\(#\|$\)' .prohibidos.txt)
-  if [ -z "$PAT" ]; then echo "   .prohibidos.txt vacío: se omite"
-  elif grep -rIniF --exclude-dir=.git --exclude=.prohibidos.txt -f <(printf '%s\n' "$PAT") . ; then mal "hay referencias prohibidas"
+paso "5. referencias prohibidas (.prohibidos.txt, HARNESS_PROHIBIDOS o ~/.config/meta-harness/prohibidos.txt)"
+LISTAS=""
+for f in ".prohibidos.txt" "${HARNESS_PROHIBIDOS:-$HOME/.config/meta-harness/prohibidos.txt}"; do
+  [ -f "$f" ] && LISTAS="$LISTAS $f"
+done
+if [ -n "$LISTAS" ]; then
+  # shellcheck disable=SC2086
+  PAT=$(cat $LISTAS | grep -v '^\s*\(#\|$\)')
+  if [ -z "$PAT" ]; then echo "   listas vacías: se omite"
+  elif grep -rIniF --exclude-dir=.git --exclude=.prohibidos.txt -f <(printf '%s\n' "$PAT") . | sed 's/^\(.\{0,60\}\).*/\1 …(línea omitida: contiene un término prohibido)/'; [ "${PIPESTATUS[0]}" -eq 0 ]; then mal "hay referencias prohibidas"
   else ok; fi
 else
-  echo "   no existe .prohibidos.txt (una palabra por línea): paso omitido"
+  echo "   no hay lista de términos prohibidos (una palabra por línea): paso omitido"
 fi
 
 echo

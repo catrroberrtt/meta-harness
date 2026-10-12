@@ -20,3 +20,7 @@ Estándar adicional: `seguridad-base.md` (20 comprobaciones previas al lanzamien
 <!-- guia-usuario:inicio -->
 Estándar adicional: `guia-al-usuario.md` (textos, estados vacíos que orientan, primer uso con datos de ejemplo y primera carga de gráficos): **se exige** en sistemas nuevos y **se marca** en proyectos existentes.
 <!-- guia-usuario:fin -->
+
+<!-- validacion-bancaria:inicio -->
+Estándar adicional: `validacion-datos-bancarios.md` (cuentas y CCI validados por reglas del catálogo de bancos, prefijo fijo y regla repetida en el servidor): reutilizable en cualquier módulo que registre una cuenta de tercero.
+<!-- validacion-bancaria:fin -->

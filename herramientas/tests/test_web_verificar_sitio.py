@@ -104,7 +104,7 @@ class Sitio(unittest.TestCase):
 
     def test_enlace_roto_y_ancla(self):
         with tempfile.TemporaryDirectory() as d:
-            e = self.verificar(sitio(d, extra='<a href="no-existe.html">x</a><a href="#nada">y</a><a href="../fuera.html">z</a><a href="mailto:a@b.c">m</a>'))
+            e = self.verificar(sitio(d, extra='<a href="no-existe.html">x</a><a href="#nada">y</a><a href="../fuera.html">z</a><a href="mailto:a@b.c">m</a>'))  # escaneo-publico: ignorar (dato falso de prueba)
             self.assertEqual(sum(h["codigo"] == "enlace-roto" for h in e), 3)
 
     def test_url_css_rota(self):

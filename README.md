@@ -60,6 +60,10 @@ Línea base de 20 comprobaciones previas al lanzamiento (`estandares/seguridad-b
 `harness erp --negocio <carpeta> --erp-base <ruta>` lee los documentos del negocio y propone qué módulos de un ERP estándar (que vive en otro repositorio) necesita, con su estado real y lo que aún no existe; no instala nada. Señales editables en `perfiles/_erp/senales.toml`. Guía y contrato con el compositor: `docs/OPCION-ERP.md`.
 <!-- opcion-erp:fin -->
 
+## Aprendizaje automático
+
+`harness aprender` registra fuentes (un ERP central, la instancia de una empresa), separa lo general de lo del negocio y deja una cola de aportes para revisar; nada se sube solo. El ERP central es la base: `harness erp` lo usa por defecto una vez registrado, sin necesitar ninguna instancia de empresa. Guía: `docs/APRENDIZAJE-AUTOMATICO.md`.
+
 <!-- open-design:inicio -->
 ## Webs de empresa (landing, sitio corporativo)
 

@@ -19,6 +19,7 @@ Una sola entrada, `harness`. La misma ayuda sale con `harness -h` o `harness ayu
 | 5 · Verificar | Ver si el entorno está sano (versión, frescura, herramientas, secretos) | `harness doctor [instancia]` | No |
 | 5 · Verificar | Ver qué hay instalado y qué falta del piso | `harness estado [instancia]` | No |
 | 6 · Actualizar | Traer la versión nueva del harness a mi instancia | `harness update [instancia]` (plan) y luego `--aplicar` | Solo con `--aplicar`; no pisa lo que cambiaste |
+| 7 · Aprender | Que lo aprendido en un proyecto (por ejemplo, el ERP central) llegue a los siguientes | `harness aprender fuentes agregar erp-base <ruta> --tipo erp` y luego `harness aprender escanear` | Solo la cola local; promover escribe con `--aplicar` y nunca sube |
 
 ## 2. Según dónde estás
 

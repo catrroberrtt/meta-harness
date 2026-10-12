@@ -8,3 +8,7 @@ Hooks de Claude Code sin datos de empresa (recordatorios antes de cerrar, bloque
 ## Origen
 
 Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia (parametrizacion).
+
+## Aprendizaje automático
+
+`plantillas/stop-aprender.sh.tpl`: hook de fin de sesión que (1) corre `harness-aprender.py escanear` en silencio (solo lee las fuentes y escribe en la cola local) y (2) sincroniza el repositorio con `harness-sincronizar.py` solo si pasa la compuerta de publicación. Nunca hace fallar la sesión. Ver `docs/APRENDIZAJE-AUTOMATICO.md`.

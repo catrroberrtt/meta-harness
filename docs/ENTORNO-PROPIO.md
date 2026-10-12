@@ -41,6 +41,11 @@ Un módulo puede arrastrar a otro (autoguardado y compuerta traen el escaneo de 
 - **Sin dependencias:** solo `bash`, `git` y `python3 >= 3.11` (biblioteca estándar).
 - **Verificable:** `./verificar.sh` comprueba sintaxis, configuración, que cada módulo tenga sus archivos y el escaneo.
 
+## Ejemplo ya generado
+
+Un entorno completo (los 7 módulos, para Claude Code y Codex) está publicado como ejemplo en
+<https://github.com/catrroberrtt/entorno-ejemplo>. Se puede clonar y probar sin instalar el harness.
+
 ## Cómo lo usa otra persona
 
 1. Clona el repositorio del entorno.

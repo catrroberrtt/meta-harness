@@ -26,6 +26,10 @@ verificaron. No se ejecutó nada; no se recomienda `npx` de sus paquetes sin aud
 | Prueba adversarial (rojo/azul) de inyección de instrucciones y uso indebido de herramientas | Comprobar las defensas de verdad | **Pendiente:** batería de casos para los hooks generados |
 | Enrutar cada consulta al modelo más barato que alcanza | Costo | **Pendiente:** hoy es criterio manual; formalizar como tabla en un estándar |
 | Cada mutación toca una superficie de una lista cerrada, con inspección previa que descalifica el resto | Autoedición acotada | **Pendiente:** aplicar a `aprender.py promover` (solo puede escribir entre marcadores; hoy ya es así) y declararlo |
+| Un mismo dato afirmado en varios lugares debe coincidir, con defensa por capas de la más rápida a la más lenta (invariantes entre lenguajes) | Un cambio se hace en 2 sitios y se olvida el tercero | **Pendiente, y ya tenemos un caso:** el catálogo de módulos del generador y la lista de archivos que exige `verificar.sh` del entorno están duplicados; falta una prueba que los compare |
+| Paquete de diagnóstico «para pegar»: un JSON con el estado, sin secretos, para quien atiende un problema | Soporte sin ida y vuelta de preguntas | **Pendiente:** `harness doctor --bundle` |
+| La documentación no debe prometer más que el código (reconciliar lo que se afirma contra lo medido) | Credibilidad | **Hecho en parte:** el módulo de publicar-solo-verificado verifica textos; falta aplicarlo a los README del propio harness |
+| Mutación dirigida por el fallo: la mejora responde a una traza que falló, no a una corazonada | Aprendizaje con dirección | **Pendiente:** que `aprender.py nota` acepte el comando o la traza que falló como evidencia estructurada |
 
 **No se adopta:** su núcleo en Rust, la publicación en npm con identidad en la nube, la memoria vectorial propia ni la
 asignación de crédito por turno: costo de mantenimiento alto y sin validar en nuestro contexto.

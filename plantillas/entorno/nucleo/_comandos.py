@@ -17,6 +17,14 @@ PROFUNDIDAD_MAX = 4
 TOPE_COMANDO = 50_000  # separar una línea más larga tarda segundos: un hook no puede colgar la sesión
 
 
+def raiz_del_entorno():
+    """La raíz del entorno: la carpeta que contiene `hooks/`. Se deduce de la ubicación de ESTE archivo, no de una variable del agente ni del
+    directorio actual: con `CLAUDE_PROJECT_DIR` ausente (otro agente) y el comando lanzado desde una subcarpeta, un hook que no encuentra su
+    configuración falla ABIERTO y deja pasar todo."""
+    import pathlib
+    return pathlib.Path(__file__).resolve().parent.parent
+
+
 def leer_evento():
     """El evento del hook como diccionario; cualquier cosa que no lo sea (vacío, lista, basura) es {}."""
     try:

@@ -24,7 +24,7 @@ Uso:
   harness-sincronizar.py [--raiz CARPETA] [--rama main] [--simulacro] [--silencioso] [--sin-subir] [--solo-compuerta]
 Salida: 0 bien o nada que hacer · 1 compuerta, conflicto o subida fallida (con --silencioso, siempre 0).
 """
-import argparse, datetime, hashlib, json, os, pathlib, subprocess, sys, tempfile
+import argparse, datetime, hashlib, json, os, pathlib, re, subprocess, sys, tempfile
 
 AQUI = pathlib.Path(__file__).resolve().parent
 RAIZ = AQUI.parent
@@ -55,6 +55,31 @@ def listas_prohibidas(raiz):
                 if l and not l.startswith("#") and l not in terminos:
                     terminos.append(l)
     return terminos
+
+
+SELLO, ARBOL = "Compuerta", "Arbol"
+
+
+def comprobar_sellos(raiz, cuantos=20):
+    """Revisa los últimos commits automáticos: ¿el árbol del commit es el que la compuerta dio por bueno? Un commit cuyo contenido se
+    cambió después (--amend, rebase, edición manual) conserva el mensaje pero ya no coincide: SELLO ROTO. Los commits que no son
+    automáticos (merges, trabajo manual) no llevan sello y no se juzgan. Devuelve (lista de (estado, commit, asunto), código)."""
+    raiz = pathlib.Path(raiz).resolve()
+    out, roto = [], False
+    log = git(raiz, "log", f"-{int(cuantos)}", "--format=%H%x1f%s%x1f%B%x1e", check=False).stdout
+    for bloque in [b for b in log.split("\x1e") if b.strip()]:
+        h, asunto, cuerpo = [x.strip("\n") for x in bloque.strip("\n").split("\x1f", 2)]
+        if not asunto.startswith("chore(auto-sync)"):
+            continue
+        m = re.search(rf"^{ARBOL}: ([0-9a-f]{{40}})$", cuerpo, re.M)
+        if not m or f"{SELLO}:" not in cuerpo:
+            out.append(("SIN SELLO", h[:8], asunto))
+            continue
+        real = git(raiz, "rev-parse", f"{h}^{{tree}}", check=False).stdout.strip()
+        estado = "SELLADO" if real == m.group(1) else "SELLO ROTO"
+        roto = roto or estado == "SELLO ROTO"
+        out.append((estado, h[:8], asunto))
+    return out, (1 if roto else 0)
 
 
 def huella(raiz):
@@ -133,7 +158,10 @@ def sincronizar(raiz, rama="main", simulacro=False, sin_subir=False, verificador
     if sucio:
         git(raiz, "add", "-A")
         n = len([l for l in git(raiz, "diff", "--cached", "--name-only").stdout.splitlines() if l])
-        git(raiz, "commit", "-q", "-m", f"chore(auto-sync): {n} archivo(s) · {datetime.datetime.now(datetime.timezone.utc):%Y-%m-%dT%H:%MZ}")
+        arbol = git(raiz, "write-tree").stdout.strip()  # id del contenido exacto sobre el que pasó la compuerta
+        git(raiz, "commit", "-q", "-m", f"chore(auto-sync): {n} archivo(s) · {datetime.datetime.now(datetime.timezone.utc):%Y-%m-%dT%H:%MZ}\n\n"
+                                        f"{SELLO}: compuerta de publicación OK (verificar.sh, secretos, personas, términos prohibidos)\n"
+                                        f"{ARBOL}: {arbol}")
         cache_guardar(huella(raiz))  # el mismo contenido, ya commiteado, sigue contando como verificado
     git(raiz, "fetch", "-q", "origin", rama)
     atras = int(git(raiz, "rev-list", "--count", f"{rama}..origin/{rama}").stdout.strip() or 0)
@@ -153,11 +181,19 @@ def main(argv=None):
     ap.add_argument("--raiz", default=str(RAIZ))
     ap.add_argument("--rama", default="main")
     ap.add_argument("--simulacro", action="store_true")
+    ap.add_argument("--comprobar-sellos", nargs="?", const=20, type=int, metavar="N",
+                    help="revisa los últimos N commits automáticos (20 por defecto): ¿su contenido sigue siendo el que pasó la compuerta?")
     ap.add_argument("--sin-subir", action="store_true")
     ap.add_argument("--solo-compuerta", action="store_true", help="corre la compuerta de publicación y sale: no commitea ni sube")
     ap.add_argument("--silencioso", action="store_true")
     ap.add_argument("--verificador", default="auto", help="ruta del script de verificación; vacío para omitirlo (solo pruebas)")
     a = ap.parse_args(argv)
+    if a.comprobar_sellos is not None:
+        filas, codigo = comprobar_sellos(a.raiz, a.comprobar_sellos)
+        for estado, h, asunto in filas:
+            print(f"  {estado:<10} {h}  {asunto}")
+        print(f"{len(filas)} commit(s) automático(s) revisado(s)." + ("" if codigo == 0 else " HAY SELLOS ROTOS: el contenido cambió después de pasar la compuerta."))
+        return codigo
     try:
         msg, cod = sincronizar(a.raiz, a.rama, a.simulacro, a.sin_subir, a.verificador, a.solo_compuerta)
     except Alto as e:

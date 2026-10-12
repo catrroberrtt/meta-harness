@@ -1,6 +1,6 @@
 # {{nombre}}
 
-Entorno de trabajo para agentes de programación, generado por **meta-harness {{version_origen}}** el {{fecha}}.
+Entorno de trabajo para agentes de programación, generado con **meta-harness** el {{fecha}}.
 Es **independiente**: no necesita el meta-harness para funcionar ni para actualizarse. Lo que contiene es tuyo.
 
 ## Qué trae (módulos elegidos)

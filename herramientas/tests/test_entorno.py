@@ -496,6 +496,486 @@ class Coherencia(unittest.TestCase):
                 self.assertTrue((PLANTILLAS_DIR / modulo / src).is_file(), f"{modulo}/{src}")
 
 
+class MejoraMedida(unittest.TestCase):
+    """Una lección puede registrar el comando que falló: solo se vuelve regla si ahora pasa. El comando nunca se lee del texto de la nota."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = pathlib.Path(self.tmp.name) / "e"
+        generar(self.d, modulos="aprendizaje", agentes="claude")
+        self.py = sys.executable
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ap(self, *a):
+        return correr([self.py, "scripts/aprender.py", *a], self.d)
+
+    def test_falla_que_ya_pasa_se_rechaza(self):
+        r = self.ap("nota", "regla", "--falla", "true")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ya pasa", r.stderr + r.stdout)
+
+    def test_no_se_promueve_hasta_que_el_comando_pase(self):
+        self.assertEqual(self.ap("nota", "Crear la marca antes", "--falla", "test -f marca.flag").returncode, 0)
+        r = self.ap("promover", "1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("sigue fallando", r.stderr)
+        self.assertNotIn("regla 1", (self.d / "AGENTS.md").read_text(encoding="utf8"))
+        (self.d / "marca.flag").write_text("", encoding="utf8")
+        self.assertEqual(self.ap("promover", "1").returncode, 0)
+        self.assertIn("<!-- regla 1 -->", (self.d / "AGENTS.md").read_text(encoding="utf8"))
+        self.assertIn("ahora pasa", (self.d / "knowledge" / "aprendizaje.md").read_text(encoding="utf8"))
+
+    def test_programa_inexistente_cuenta_como_fallo(self):
+        r = self.ap("nota", "x", "--falla", "programa-que-no-existe-xyz")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("127", (self.d / "knowledge" / "aprendizaje.md").read_text(encoding="utf8"))
+        self.assertEqual(self.ap("promover", "1").returncode, 1)
+
+    def test_una_nota_manipulada_no_hace_ejecutar_comandos(self):
+        self.ap("nota", "Crear la marca", "--falla", "test -f marca.flag")
+        notas = self.d / "knowledge" / "aprendizaje.md"
+        notas.write_text(notas.read_text(encoding="utf8").replace("test -f marca.flag", "touch pwned.flag"), encoding="utf8")
+        self.ap("promover", "1")
+        self.assertFalse((self.d / "pwned.flag").exists(), "se ejecutó un comando sacado del texto de la nota")
+
+    def test_sin_registro_local_se_avisa_que_no_hubo_comprobacion(self):
+        self.ap("nota", "Crear la marca", "--falla", "test -f marca.flag")
+        (self.d / ".entorno" / "fallas.json").unlink()
+        r = self.ap("promover", "1")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("SIN comprobación automática", r.stderr)
+
+    def test_nota_con_evidencia_de_texto_sigue_funcionando(self):
+        self.ap("nota", "Una regla", "--evidencia", "caso real")
+        self.assertEqual(self.ap("promover", "1").returncode, 0)
+
+    def test_comando_con_caracteres_prohibidos_se_rechaza(self):
+        for c in ("test -f a\nb", "x --> y", "a" * 400):
+            self.assertNotEqual(self.ap("nota", "x", "--falla", c).returncode, 0, repr(c[:20]))
+
+
+class BloqueoDatos(unittest.TestCase):
+    """El agente no escribe en bases de datos ni se conecta a ambientes que no son locales."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.d = pathlib.Path(cls.tmp.name) / "e"
+        generar(cls.d, modulos="bloqueo-datos")
+        (cls.d / "lee.sql").write_text("SELECT * FROM t;\nSHOW CREATE TABLE t;\n", encoding="utf8")
+        (cls.d / "escribe.sql").write_text("SELECT 1;\nDELETE FROM t;\n", encoding="utf8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def decision(self, cmd):
+        r = correr([sys.executable, "hooks/bloquear-datos.py"], self.d, entrada=json.dumps({"tool_input": {"command": cmd}, "cwd": str(self.d)}),
+                   env={"CLAUDE_PROJECT_DIR": str(self.d)})
+        self.assertEqual(r.returncode, 0, r.stderr[:200])
+        return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] if r.stdout.strip() else "pasa"
+
+    def test_lecturas_locales_pasan(self):
+        for cmd in ('mysql -h 127.0.0.1 -P 3306 -u u db -e "SELECT * FROM t"', 'mysql -e "SHOW CREATE TABLE t"', "mysql -h localhost db -e 'select created_at, deleted_at from t'",
+                    'psql -h ::1 -c "SELECT 1"', "mysql db < lee.sql", 'mysql -e "EXPLAIN SELECT 1"', "sqlite3 local.db 'SELECT 1'",
+                    "mysqldump -h 127.0.0.1 db t", 'docker exec c mysql -e "SELECT 1"'):
+            self.assertEqual(self.decision(cmd), "pasa", cmd)
+
+    def test_hosts_remotos_se_rechazan_de_cualquier_forma(self):
+        for cmd in ('mysql -h prod.ejemplo.com -e "SELECT 1"', "mysql -hprod.ejemplo.com -e 'SELECT 1'", "mysql --host=prod.ejemplo.com -e 'SELECT 1'",
+                    "mysql --host prod.ejemplo.com -e 'SELECT 1'", 'psql postgresql://u' + '@prod.ejemplo.com/db -c "SELECT 1"',
+                    "mongosh mongodb://prod.ejemplo.com/db --eval 'db.c.find()'", "redis-cli -h " + ".".join(["10", "0", "0", "5"]) + " get k",
+                    'bash -c "mysql -h prod.ejemplo.com -e \'SELECT 1\'"', 'echo "$(mysql -h prod.ejemplo.com -e \'SELECT 1\')"'):
+            self.assertEqual(self.decision(cmd), "deny", cmd)
+
+    def test_escrituras_se_rechazan_aunque_sean_locales(self):
+        for cmd in ('mysql -e "INSERT INTO t VALUES (1)"', 'mysql -e "delete from t"', 'mysql -e "UPDATE t SET a=1"', 'mysql -e "DROP TABLE t"',
+                    'mysql -e "ALTER TABLE t ADD c INT"', 'mysql -e "truncate t"', 'psql -c "create table x(a int)"', "mongosh --eval 'db.c.deleteMany({})'",
+                    'mysql -e "SELECT 1; DELETE FROM t"', "mysql db < escribe.sql", "mysql db -f escribe.sql", "mysql db < no-existe.sql",
+                    'docker exec c mysql -e "DROP TABLE t"', 'bash -c "mysql -e \'DELETE FROM t\'"', "mysqlimport db datos.txt", "pg_restore -d db x.dump"):
+            self.assertEqual(self.decision(cmd), "deny", cmd)
+
+    def test_heredoc_con_escritura_se_rechaza(self):
+        self.assertEqual(self.decision("mysql -h 127.0.0.1 db <<EOF\nDELETE FROM t\nEOF"), "deny")
+        self.assertEqual(self.decision("mysql -h 127.0.0.1 db <<EOF\nSELECT 1\nEOF"), "pasa")
+
+    def test_comandos_que_no_son_bases_de_datos_no_se_tocan(self):
+        for cmd in ("ls -la", "git status", "echo mysql DELETE", "grep -r 'DROP TABLE' docs", "docker ps", "npm test"):
+            self.assertEqual(self.decision(cmd), "pasa", cmd)
+
+    def test_se_configura_con_entorno_toml(self):
+        toml = (self.d / "entorno.toml").read_text(encoding="utf8")
+        try:
+            (self.d / "entorno.toml").write_text(toml.replace('hosts_permitidos = ["127.0.0.1", "localhost", "::1"]', 'hosts_permitidos = ["127.0.0.1", "db.interna"]')
+                                                 .replace("solo_lectura = true", "solo_lectura = false"), encoding="utf8")
+            self.assertEqual(self.decision('mysql -h db.interna -e "SELECT 1"'), "pasa")
+            self.assertEqual(self.decision('mysql -h 127.0.0.1 -e "UPDATE t SET a=1"'), "pasa")  # escritura local permitida a propósito
+            self.assertEqual(self.decision('mysql -h prod.ejemplo.com -e "SELECT 1"'), "deny")   # remoto sigue prohibido
+        finally:
+            (self.d / "entorno.toml").write_text(toml, encoding="utf8")
+
+    def test_entrada_basura_y_linea_enorme(self):
+        for bruto in ("", "no es json", "[]", '{"tool_input": null}', '{"tool_input": {"command": 7}}'):
+            r = correr([sys.executable, "hooks/bloquear-datos.py"], self.d, entrada=bruto, env={"CLAUDE_PROJECT_DIR": str(self.d)})
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, ""), bruto)
+        t0 = time.time()
+        self.assertEqual(self.decision("echo " + "a" * 200_000 + " && mysql -e 'SELECT 1'"), "deny")
+        self.assertEqual(self.decision("echo " + "a" * 200_000), "pasa")
+        self.assertLess(time.time() - t0, 10)
+
+
+class FormatoDePR(unittest.TestCase):
+    TIPOS = ('\n[[pr.tipos]]\nnombre = "pase a producción"\ncuando_base = "^main$"\nsecciones = ["Resumen del cambio", "Plan de despliegue", "Plan de respaldo"]\n'
+             '\n[[pr.tipos]]\nnombre = "corrección"\ncuando_titulo = "^fix"\nsecciones = ["Qué resuelve", "Pruebas"]\n')
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.d = pathlib.Path(cls.tmp.name) / "e"
+        generar(cls.d, modulos="formato-de-pr")
+        toml = cls.d / "entorno.toml"
+        toml.write_text(toml.read_text(encoding="utf8") + cls.TIPOS, encoding="utf8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def decision(self, cmd):
+        r = correr([sys.executable, "hooks/formato-de-pr.py"], self.d, entrada=json.dumps({"tool_input": {"command": cmd}}), env={"CLAUDE_PROJECT_DIR": str(self.d)})
+        self.assertEqual(r.returncode, 0)
+        return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecisionReason"] if r.stdout.strip() else "pasa"
+
+    def cuerpo(self, nombre, texto):
+        (self.d / nombre).write_text(texto, encoding="utf8")
+        return nombre
+
+    def test_pase_a_produccion_exige_sus_secciones(self):
+        crear = "gh pr " + "create --base main --title t --body-file "
+        completo = self.cuerpo("ok.md", "## 1. Resumen del cambio\nx\n## 2. Plan de despliegue (manual)\nx\n### **Plan de respaldo**:\nx\n")
+        self.assertEqual(self.decision(crear + completo), "pasa")
+        falta = self.cuerpo("falta.md", "## Resumen del cambio\nx\n## Plan de despliegue\nx\n")
+        razon = self.decision(crear + falta)
+        self.assertIn("Plan de respaldo", razon)
+        self.assertNotIn("Resumen del cambio, ", razon)
+
+    def test_se_distingue_el_tipo_por_titulo(self):
+        crear = "gh pr " + "create --base qas --title 'fix(x): algo' --body-file "
+        self.assertIn("Pruebas", self.decision(crear + self.cuerpo("c1.md", "## Qué resuelve\nx\n")))
+        self.assertEqual(self.decision(crear + self.cuerpo("c2.md", "## Qué resuelve\nx\n## Pruebas\ny\n")), "pasa")
+
+    def test_sin_tipo_que_coincida_deja_pasar(self):
+        self.assertEqual(self.decision("gh pr " + "create --base qas --title 'feat: algo' --body-file " + self.cuerpo("c3.md", "nada\n")), "pasa")
+
+    def test_un_pr_de_tipo_exigente_sin_archivo_o_ilegible_se_rechaza(self):
+        self.assertIn("--body-file", self.decision("gh pr " + "create --base main --title t --body 'inline'"))
+        self.assertIn("No se puede leer", self.decision("gh pr " + "create --base main --title t --body-file no-existe.md"))
+
+    def test_otros_comandos_y_sin_tipos_no_hacen_nada(self):
+        self.assertEqual(self.decision("gh pr view 3"), "pasa")
+        self.assertEqual(self.decision("gh pr " + "edit 3 --body-file x.md"), "pasa")
+        with tempfile.TemporaryDirectory() as t:
+            vacio = pathlib.Path(t) / "e"
+            generar(vacio, modulos="formato-de-pr")
+            r = correr([sys.executable, "hooks/formato-de-pr.py"], vacio, entrada=json.dumps({"tool_input": {"command": "gh pr " + "create --base main --body-file x.md"}}),
+                       env={"CLAUDE_PROJECT_DIR": str(vacio)})
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, ""))
+
+    def test_encadenado_y_anidado(self):
+        falta = self.cuerpo("f2.md", "## Resumen del cambio\nx\n")
+        self.assertIn("Plan de despliegue", self.decision("echo hola && gh pr " + "create --base main --title t --body-file " + falta))
+        self.assertIn("Plan de despliegue", self.decision('bash -c "gh pr ' + 'create --base main --title t --body-file ' + falta + '"'))
+
+
+class FuentesYSellos(unittest.TestCase):
+    """Inventario de repositorios y revisión de los sellos `verificado-contra-git`."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = pathlib.Path(self.tmp.name)
+        self.remoto = base / "remoto.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(self.remoto)], check=True)
+        self.repo = base / "api"
+        subprocess.run(["git", "clone", "-q", str(self.remoto), str(self.repo)], check=True, capture_output=True)
+        self.git("checkout", "-q", "-b", "main")
+        self.commit("uno")
+        self.git("push", "-q", "-u", "origin", "main")
+        self.d = base / "e"
+        generar(self.d, modulos="sello-de-verificacion")
+        toml = self.d / "entorno.toml"
+        toml.write_text(toml.read_text(encoding="utf8") + f'\n[[fuentes.repos]]\nnombre = "api"\nruta = "{self.repo}"\nreferencia = "origin/main"\n', encoding="utf8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def git(self, *a):
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@ejemplo.invalid", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@ejemplo.invalid")
+        return subprocess.run(["git", "-C", str(self.repo), *a], capture_output=True, text=True, env=env).stdout.strip()
+
+    def commit(self, nombre):
+        (self.repo / f"{nombre}.txt").write_text(nombre, encoding="utf8")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", nombre)
+
+    def sellos(self, *extra):
+        return correr([sys.executable, "scripts/sellos.py", *extra], self.d)
+
+    def documento(self, linea):
+        (self.d / "docs").mkdir(exist_ok=True)
+        (self.d / "docs" / "estado.md").write_text(linea + "\n", encoding="utf8")
+
+    def test_inventario_da_sello_con_el_commit_de_la_referencia(self):
+        r = correr([sys.executable, "scripts/inventario-fuentes.py", "--sin-red"], self.d)
+        sha = self.git("rev-parse", "--short", "origin/main")
+        self.assertIn(f"verificado-contra-git: {sha} · api · {dt_hoy()}", r.stdout)
+        self.assertIn("SIN RED", r.stdout.upper())
+
+    def test_inventario_reporta_repo_ausente_sin_inventar_estado(self):
+        toml = self.d / "entorno.toml"
+        toml.write_text(toml.read_text(encoding="utf8") + '\n[[fuentes.repos]]\nnombre = "fantasma"\nruta = "/no/existe"\nreferencia = "origin/main"\n', encoding="utf8")
+        r = correr([sys.executable, "scripts/inventario-fuentes.py", "--sin-red"], self.d)
+        self.assertRegex(r.stdout, r"fantasma .*FALTA")
+        self.assertNotIn("verificado-contra-git: ", r.stdout.split("fantasma")[0].splitlines()[-1] if "fantasma" in r.stdout else "")
+
+    def test_inventario_con_red_trae_lo_remoto_y_cuenta_lo_atrasado(self):
+        otro = pathlib.Path(self.tmp.name) / "otro"
+        subprocess.run(["git", "clone", "-q", str(self.remoto), str(otro)], check=True, capture_output=True)
+        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@ejemplo.invalid", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@ejemplo.invalid")
+        (otro / "nuevo.txt").write_text("n", encoding="utf8")
+        subprocess.run(["git", "-C", str(otro), "add", "-A"], check=True, env=env)
+        subprocess.run(["git", "-C", str(otro), "commit", "-q", "-m", "remoto"], check=True, env=env)
+        subprocess.run(["git", "-C", str(otro), "push", "-q", "origin", "main"], check=True, env=env)
+        r = correr([sys.executable, "scripts/inventario-fuentes.py"], self.d)
+        self.assertIn("1 por detrás", r.stdout)
+
+    def test_sello_vigente(self):
+        sha = self.git("rev-parse", "--short", "origin/main")
+        self.documento(f"> verificado-contra-git: {sha} · api · {dt_hoy()}")
+        r = self.sellos()
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("VIGENTE", r.stdout)
+
+    def test_sello_atrasado_avisa_y_con_estricto_falla(self):
+        sha = self.git("rev-parse", "--short", "origin/main")
+        self.documento(f"> verificado-contra-git: {sha} · api · {dt_hoy()}")
+        self.commit("dos")
+        self.git("push", "-q", "origin", "main")
+        self.git("fetch", "-q", "origin")
+        r = self.sellos()
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("ATRASADO", r.stdout)
+        self.assertIn("avanzó 1 commit", r.stdout)
+        self.assertEqual(self.sellos("--estricto").returncode, 1)
+
+    def test_sello_inventado_falla(self):
+        self.documento(f"> verificado-contra-git: {'a' * 7} · api · {dt_hoy()}")
+        r = self.sellos()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("INEXISTENTE", r.stdout)
+        self.assertIn("Siguiente:", r.stdout)
+
+    def test_sello_vencido_y_repo_desconocido(self):
+        sha = self.git("rev-parse", "--short", "origin/main")
+        self.documento(f"> verificado-contra-git: {sha} · api · 2020-01-01\n> verificado-contra-git: {sha} · otro · {dt_hoy()}")
+        r = self.sellos()
+        self.assertIn("VENCIDO", r.stdout)
+        self.assertIn("SIN REPO", r.stdout)
+        self.assertEqual(self.sellos("--estricto").returncode, 1)
+
+    def test_sin_sellos_no_falla(self):
+        self.documento("Sin ningún sello aquí.")
+        r = self.sellos()
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("0 sello(s)", r.stdout)
+
+
+def dt_hoy():
+    import datetime
+    return datetime.date.today().isoformat()
+
+
+class Codex(unittest.TestCase):
+    """Hooks para Codex: mismo formato que Claude Code, pero sin su variable de entorno y lanzados desde cualquier carpeta."""
+
+    MODULOS = "compuerta-calidad,publicar-solo-verificado,bloqueo-datos,formato-de-pr,autoguardado,documentacion-primero"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.d = pathlib.Path(cls.tmp.name) / "e"
+        generar(cls.d, modulos=cls.MODULOS, agentes="codex")
+        (cls.d / "sub" / "dentro").mkdir(parents=True)
+        (cls.d / "sin.md").write_text("Texto largo que nadie verificó nunca de ninguna manera.\n", encoding="utf8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def evento(self, cmd, cwd):
+        """Un evento con los campos obligatorios del esquema de Codex (pre-tool-use.command.input)."""
+        return json.dumps({"cwd": str(cwd), "hook_event_name": "PreToolUse", "model": "m", "permission_mode": "default", "session_id": "s",
+                           "tool_input": {"command": cmd}, "tool_name": "Bash", "tool_use_id": "t", "transcript_path": None, "turn_id": "1"})
+
+    def correr_hook(self, script, cmd, cwd):
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}  # Codex no la define
+        r = subprocess.run([sys.executable, str(self.d / "hooks" / script)], input=self.evento(cmd, cwd), capture_output=True, text=True, env=env, cwd=cwd)
+        self.assertEqual(r.returncode, 0, r.stderr[:200])
+        return "deny" if '"deny"' in r.stdout else "pasa"
+
+    def test_hooks_json_es_valido_y_apunta_a_hooks_existentes(self):
+        doc = json.loads((self.d / ".codex" / "hooks.json").read_text(encoding="utf8"))
+        comandos = []
+        for evento, grupos in doc["hooks"].items():
+            for g in grupos:
+                for h in g["hooks"]:
+                    self.assertEqual(h["type"], "command")
+                    comandos.append(h["command"])
+                if evento == "PreToolUse":
+                    self.assertEqual(g["matcher"], "^Bash$")
+        for cmd in comandos:
+            script = re.search(r"hooks/([\w.-]+\.(?:py|sh))", cmd).group(1)
+            self.assertTrue((self.d / "hooks" / script).is_file(), script)
+            self.assertIn("git rev-parse --show-toplevel", cmd)
+
+    def test_solo_los_eventos_documentados(self):
+        doc = json.loads((self.d / ".codex" / "hooks.json").read_text(encoding="utf8"))
+        self.assertEqual(set(doc["hooks"]), {"PreToolUse", "SessionEnd"})
+        self.assertNotIn("UserPromptSubmit", doc["hooks"])  # su formato de salida en Codex no está confirmado
+        self.assertNotIn("documentacion-primero", (self.d / ".codex" / "hooks.json").read_text(encoding="utf8"))
+
+    def test_incluye_la_nota_de_confianza_y_de_falla_abierta(self):
+        nota = (self.d / "docs" / "CODEX.md").read_text(encoding="utf8")
+        for esperado in ("/hooks", "falla abierto", "apply_patch", "no probado"):
+            self.assertIn(esperado, nota.lower() if esperado.islower() else nota)
+
+    def test_sin_codex_no_se_genera_nada_de_codex_y_viceversa(self):
+        with tempfile.TemporaryDirectory() as t:
+            solo_claude = pathlib.Path(t) / "c"
+            generar(solo_claude, modulos=self.MODULOS, agentes="claude")
+            self.assertFalse((solo_claude / ".codex").exists())
+            self.assertFalse((solo_claude / "docs" / "CODEX.md").exists())
+            self.assertTrue((solo_claude / ".claude" / "settings.json").is_file())
+        self.assertFalse((self.d / ".claude").exists())
+
+    def test_bloquea_desde_la_raiz_y_desde_una_subcarpeta_sin_la_variable_de_claude(self):
+        publicar = "gh pr " + "create --title t --body-file " + str(self.d / "sin.md")
+        for cwd in (self.d, self.d / "sub" / "dentro"):
+            self.assertEqual(self.correr_hook("publicar-solo-verificado.py", publicar, cwd), "deny", f"cwd={cwd.name}")
+            self.assertEqual(self.correr_hook("bloquear-datos.py", 'mysql -h prod.ejemplo.com -e "SELECT 1"', cwd), "deny", f"cwd={cwd.name}")
+
+    def test_ruta_relativa_del_cuerpo_se_resuelve_contra_el_directorio_del_comando(self):
+        sub = self.d / "sub" / "dentro"
+        (sub / "cuerpo.md").write_text("Texto largo sin verificar, suficiente.\n", encoding="utf8")
+        crear = "gh pr " + "create --title t --body-file cuerpo.md"
+        self.assertEqual(self.correr_hook("publicar-solo-verificado.py", crear, sub), "deny")  # lo encuentra y no tiene marca
+        self.assertEqual(self.correr_hook("publicar-solo-verificado.py", crear, self.d), "deny")  # ahí no existe: también se rechaza
+
+    def test_commit_se_detecta_desde_una_subcarpeta(self):
+        toml = (self.d / "entorno.toml").read_text(encoding="utf8")
+        (self.d / "entorno.toml").write_text(toml.replace("bloquear_commit = false", "bloquear_commit = true"), encoding="utf8")
+        (self.d / ".entorno").mkdir(exist_ok=True)
+        (self.d / ".entorno" / "gate-ok").unlink(missing_ok=True)
+        try:
+            env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
+            r = subprocess.run([sys.executable, str(self.d / "hooks" / "gate-antes-de-commit.py")], input=self.evento("git commit -m x", self.d / "sub"),
+                               capture_output=True, text=True, env=env, cwd=self.d / "sub")
+            self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        finally:
+            (self.d / "entorno.toml").write_text(toml, encoding="utf8")
+
+
+class Comparar(unittest.TestCase):
+    """`--comparar`: tres vías (lo generado, lo que hay, lo que generaría hoy). Nunca pisa lo que la persona cambió."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = pathlib.Path(self.tmp.name)
+        self.d = self.base / "env"
+        generar(self.d, modulos="aprendizaje", agentes="claude")
+        self.plantillas_originales = ent.PLANTILLAS
+
+    def tearDown(self):
+        ent.PLANTILLAS = self.plantillas_originales
+        self.tmp.cleanup()
+
+    def informe(self, aplicar=False):
+        import contextlib, io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            codigo = ent.comparar(self.d, aplicar)
+        return codigo, buf.getvalue()
+
+    def generador_cambia(self, plantilla, agregado):
+        import shutil
+        copia = self.base / "plantillas"
+        if not copia.exists():
+            shutil.copytree(self.plantillas_originales, copia)
+        ent.PLANTILLAS = copia
+        ruta = copia / plantilla
+        ruta.write_text(ruta.read_text(encoding="utf8") + agregado, encoding="utf8")
+
+    def test_recien_generado_no_tiene_diferencias(self):
+        codigo, salida = self.informe()
+        self.assertEqual(codigo, 0)
+        self.assertIn("Sin diferencias", salida)
+
+    def test_lo_que_edita_la_persona_se_marca_como_suyo(self):
+        f = self.d / "scripts" / "aprender.py"
+        f.write_text(f.read_text(encoding="utf8") + "\n# mío\n", encoding="utf8")
+        codigo, salida = self.informe()
+        self.assertEqual(codigo, 0)
+        self.assertRegex(salida, r"TUYO\s+scripts/aprender\.py")
+
+    def test_mejora_del_generador_sobre_archivo_intacto_es_segura_y_se_aplica(self):
+        self.generador_cambia("nucleo/AGENTS.md.tpl", "\n- Regla nueva del generador.\n")
+        codigo, salida = self.informe()
+        self.assertRegex(salida, r"SEGURO\s+AGENTS\.md")
+        self.assertNotIn("Regla nueva", (self.d / "AGENTS.md").read_text(encoding="utf8"))  # sin --aplicar-seguras no se toca
+        self.informe(aplicar=True)
+        self.assertIn("Regla nueva del generador", (self.d / "AGENTS.md").read_text(encoding="utf8"))
+        self.assertIn("Sin diferencias", self.informe()[1])
+
+    def test_conflicto_nunca_se_toca_solo(self):
+        f = self.d / "scripts" / "aprender.py"
+        f.write_text(f.read_text(encoding="utf8") + "\n# mío\n", encoding="utf8")
+        self.generador_cambia("aprendizaje/aprender.py", "\n# mejora del generador\n")
+        codigo, salida = self.informe(aplicar=True)
+        self.assertEqual(codigo, 1)
+        self.assertRegex(salida, r"REVISAR\s+scripts/aprender\.py")
+        texto = f.read_text(encoding="utf8")
+        self.assertIn("# mío", texto)
+        self.assertNotIn("mejora del generador", texto)
+
+    def test_archivo_borrado_por_la_persona_no_se_recrea(self):
+        (self.d / "scripts" / "aprender.py").unlink()
+        codigo, salida = self.informe(aplicar=True)
+        self.assertRegex(salida, r"INFO\s+scripts/aprender\.py")
+        self.assertFalse((self.d / "scripts" / "aprender.py").exists())
+
+    def test_lock_ausente_ilegible_o_hostil_se_rechaza(self):
+        lock = self.d / "entorno.lock.json"
+        original = lock.read_text(encoding="utf8")
+        datos = json.loads(original)
+        casos = {"ilegible": "no es json", "forma inesperada": json.dumps({"opciones": {}, "archivos": []}),
+                 "ruta fuera": json.dumps({**datos, "archivos": {**datos["archivos"], "../../../etc/passwd": "x"}}),
+                 "ruta absoluta": json.dumps({**datos, "archivos": {**datos["archivos"], "/etc/passwd": "x"}}),
+                 "nombre hostil": json.dumps({**datos, "opciones": {**datos["opciones"], "nombre": "ok\n[x]"}}),
+                 "módulo inexistente": json.dumps({**datos, "opciones": {**datos["opciones"], "modulos": ["inventado"]}}),
+                 "perfil como ruta": json.dumps({**datos, "opciones": {**datos["opciones"], "perfiles": ["../herramientas"]}})}
+        for nombre, contenido in casos.items():
+            lock.write_text(contenido, encoding="utf8")
+            self.assertEqual(self.informe()[0], 2, nombre)
+        lock.unlink()
+        self.assertEqual(self.informe()[0], 2)
+
+    def test_lock_registra_hash_de_cada_archivo_menos_el_propio(self):
+        datos = json.loads((self.d / "entorno.lock.json").read_text(encoding="utf8"))
+        self.assertNotIn("entorno.lock.json", datos["archivos"])
+        for ruta, h in datos["archivos"].items():
+            self.assertEqual(ent.huella((self.d / ruta).read_text(encoding="utf8")), h, ruta)
+
+
 PLANTILLAS_DIR = RAIZ / "plantillas" / "entorno"
 
 

@@ -24,3 +24,7 @@ Estándar adicional: `guia-al-usuario.md` (textos, estados vacíos que orientan,
 <!-- validacion-bancaria:inicio -->
 Estándar adicional: `validacion-datos-bancarios.md` (cuentas y CCI validados por reglas del catálogo de bancos, prefijo fijo y regla repetida en el servidor): reutilizable en cualquier módulo que registre una cuenta de tercero.
 <!-- validacion-bancaria:fin -->
+
+<!-- enrutamiento:inicio -->
+Estándar adicional: `enrutamiento-de-modelos.md` (cada tarea al modelo más barato que cumple la vara, con tabla de partida y forma de medirla): el riesgo manda sobre el precio.
+<!-- enrutamiento:fin -->

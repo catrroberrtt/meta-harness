@@ -24,7 +24,7 @@ def main():
         hay_commit, hay_push = "commit" in subs, "push" in subs
     if not (hay_commit or hay_push):
         return 0
-    raiz = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+    raiz = str(c.raiz_del_entorno())
     ok = os.path.join(raiz, ".entorno", "gate-ok")
     if os.path.exists(ok) and time.time() - os.path.getmtime(ok) < 3600:
         return 0

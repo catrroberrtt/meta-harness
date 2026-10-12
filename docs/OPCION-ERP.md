@@ -34,7 +34,7 @@ Datos editables, sin código: `perfiles/_erp/senales.toml` (o el archivo que pas
 
 ## Qué NO hace aún
 
-- **No compone ni copia nada del ERP**: el compositor (`componer-erp`) está en diseño en el ERP (su `docs/COMPOSICION.md`) y no tiene código. *No verificado* contra un compositor real: solo contra el catálogo.
+- **No compone ni copia nada del ERP**: el compositor (`componer-erp`) está en diseño en el ERP (su `docs/COMPOSICION.md` (externo)) y no tiene código. *No verificado* contra un compositor real: solo contra el catálogo.
 - No construye módulos que están planeados; no decide por ti (las señales son palabras de tus documentos: confirma, quita o agrega).
 - No lee `.pdf`, `.docx` ni imágenes (se exportan a `.md`/`.csv`/`.xlsx`); no lee Drive ni ningún conector.
 - No genera el contenido del perfil de configuración (solo sugiere su nombre; el módulo `perfiles-configuracion` del ERP está planeado).

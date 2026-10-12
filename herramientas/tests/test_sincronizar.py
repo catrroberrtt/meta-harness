@@ -197,5 +197,63 @@ class Remoto(Base):
         self.assertEqual(g(self.w, "status", "--porcelain"), "", "el merge se abortó limpio")
 
 
+class Sellos(Base):
+    """Cada commit automático anota el árbol sobre el que pasó la compuerta; si el contenido cambia después, el sello se rompe."""
+
+    def automatico(self):
+        (self.w / "nota.md").write_text("Contenido que pasa la compuerta.\n", encoding="utf8")
+        c, _, _ = self.sync()
+        self.assertEqual(c, 0)
+
+    def test_el_commit_automatico_lleva_sello_con_el_arbol(self):
+        self.automatico()
+        cuerpo = g(self.w, "log", "-1", "--format=%B")
+        arbol = g(self.w, "rev-parse", "HEAD^{tree}")
+        self.assertIn("Compuerta: compuerta de publicación OK", cuerpo)
+        self.assertIn(f"Arbol: {arbol}", cuerpo)
+
+    def test_comprobar_sellos_da_sellado_y_codigo_cero(self):
+        self.automatico()
+        filas, codigo = sy.comprobar_sellos(self.w)
+        self.assertEqual(codigo, 0)
+        self.assertEqual(filas[0][0], "SELLADO")
+
+    def test_cambiar_el_contenido_despues_rompe_el_sello(self):
+        self.automatico()
+        (self.w / "nota.md").write_text("Contenido cambiado DESPUÉS de la compuerta.\n", encoding="utf8")
+        g(self.w, "add", "-A")
+        g(self.w, "commit", "-q", "--amend", "-C", "HEAD")  # conserva el mensaje con el sello, pero el árbol es otro
+        filas, codigo = sy.comprobar_sellos(self.w)
+        self.assertEqual(codigo, 1)
+        self.assertEqual(filas[0][0], "SELLO ROTO")
+
+    def test_un_commit_automatico_sin_sello_se_senala_sin_romper(self):
+        (self.w / "x.md").write_text("x\n", encoding="utf8")
+        g(self.w, "add", "-A")
+        g(self.w, "commit", "-q", "-m", "chore(auto-sync): 1 archivo(s) · hecho a mano sin pasar por la compuerta")
+        filas, codigo = sy.comprobar_sellos(self.w)
+        self.assertEqual(filas[0][0], "SIN SELLO")
+        self.assertEqual(codigo, 0)
+
+    def test_commits_manuales_no_se_juzgan(self):
+        (self.w / "x.md").write_text("x\n", encoding="utf8")
+        g(self.w, "add", "-A")
+        g(self.w, "commit", "-q", "-m", "docs: trabajo manual")
+        self.assertEqual(sy.comprobar_sellos(self.w), ([], 0))
+
+    def test_sello_falsificado_con_arbol_inventado_se_detecta(self):
+        (self.w / "x.md").write_text("x\n", encoding="utf8")
+        g(self.w, "add", "-A")
+        g(self.w, "commit", "-q", "-m", "chore(auto-sync): 1 archivo(s)\n\nCompuerta: compuerta de publicación OK\nArbol: " + "a" * 40)
+        filas, codigo = sy.comprobar_sellos(self.w)
+        self.assertEqual((filas[0][0], codigo), ("SELLO ROTO", 1))
+
+    def test_comando_de_linea(self):
+        self.automatico()
+        c, salida, _ = correr("--raiz", str(self.w), "--comprobar-sellos", "5")
+        self.assertEqual(c, 0)
+        self.assertIn("SELLADO", salida)
+
+
 if __name__ == "__main__":
     unittest.main()

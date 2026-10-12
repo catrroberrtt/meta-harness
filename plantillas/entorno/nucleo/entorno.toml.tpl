@@ -1,7 +1,7 @@
 # Configuración del entorno. Es el único archivo que hace falta tocar para adaptarlo.
 [entorno]
 nombre = "{{nombre}}"
-origen = "meta-harness {{version_origen}}"
+origen = "meta-harness"
 generado = "{{fecha}}"
 modulos = [{{modulos_toml}}]
 agentes = [{{agentes_toml}}]

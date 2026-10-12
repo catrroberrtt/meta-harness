@@ -57,7 +57,8 @@ def main():
         return
     if c.demasiado_largo(cmd):
         denegar("La línea de comandos es demasiado larga para verificarla. Escribe el cuerpo en un archivo corto, verifícalo y publica con --body-file.")
-    raiz = pathlib.Path(os.environ.get("CLAUDE_PROJECT_DIR") or evento.get("cwd") or os.getcwd())
+    raiz = c.raiz_del_entorno()
+    cwd = pathlib.Path(evento.get("cwd") if isinstance(evento.get("cwd"), str) and evento.get("cwd") else os.getcwd())
     try:
         cfg = tomllib.loads((raiz / "entorno.toml").read_text(encoding="utf8")).get("publicar", {})
     except (OSError, tomllib.TOMLDecodeError):
@@ -88,7 +89,7 @@ def main():
                         "generes en el mismo comando que publica: la verificación se comprueba antes de ejecutar y no sería válida. "
                         "Prepáralo en un comando aparte, verifícalo y publica después.")
         p = pathlib.Path(archivo)
-        p = p if p.is_absolute() else raiz / p
+        p = p if p.is_absolute() else cwd / p  # una ruta relativa es relativa al directorio donde corre el comando
         if not p.is_file():
             denegar(f"El archivo del cuerpo no existe o no es un archivo: {archivo}")
         texto = p.read_text(encoding="utf8", errors="replace")

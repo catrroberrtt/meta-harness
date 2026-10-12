@@ -29,6 +29,10 @@ req = {"documentacion-primero": ["scripts/buscar-documentacion.py", "hooks/docum
        "escaneo-secretos": ["scripts/escanear-secretos.py"],
        "autoguardado": ["scripts/autoguardar.py", "hooks/autoguardado.sh"],
        "aprendizaje": ["scripts/aprender.py", "knowledge/aprendizaje.md"],
+       "bloqueo-datos": ["hooks/bloquear-datos.py", "hooks/_comandos.py"],
+       "formato-de-pr": ["hooks/formato-de-pr.py", "hooks/_comandos.py"],
+       "inventario-de-fuentes": ["scripts/inventario-fuentes.py"],
+       "sello-de-verificacion": ["scripts/sellos.py"],
        "publicar-solo-verificado": ["scripts/verificar-publicacion.py", "hooks/publicar-solo-verificado.py", "docs/revisor-independiente.md", "hooks/_comandos.py"]}
 faltan = [f for m in mods for f in req.get(m, []) if not pathlib.Path(f).exists()]
 assert not faltan, faltan

@@ -667,6 +667,54 @@ def doctor(instancia, raiz=RAIZ):
     return filas
 
 
+_SECRETOS_BUNDLE = [re.compile(x) for x in (
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----", r"\bAKIA[0-9A-Z]{16}\b", r"\bgh[pousr]_[A-Za-z0-9]{30,}\b",
+    r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b", r"(?i)(passw(or)?d|secret|token|api[_-]?key)(\s*[:=]\s*)\S+",
+    r"https?://[^/\s:@]+:[^/\s:@]{3,}@")]
+
+
+def redactar(valor, casa=None):
+    """Quita de un texto o estructura lo que no debe salir en un paquete para pegar: secretos y la ruta personal (se deja «~»)."""
+    casa = str(casa if casa is not None else Path.home())
+    if isinstance(valor, str):
+        if casa and casa != "/":
+            valor = valor.replace(casa, "~")
+        for pat in _SECRETOS_BUNDLE:
+            valor = pat.sub(lambda m: (m.group(1) + (m.group(3) or "") + "«oculto»") if pat.groups >= 3 and m.lastindex and m.lastindex >= 3 else "«oculto»", valor)
+        return valor
+    if isinstance(valor, dict):
+        return {redactar(k, casa): redactar(v, casa) for k, v in valor.items()}
+    if isinstance(valor, (list, tuple)):
+        return [redactar(v, casa) for v in valor]
+    return valor
+
+
+def paquete_diagnostico(instancia, raiz=RAIZ):
+    """JSON para pegar a quien atiende un problema: versiones, sistema, resultado de `doctor` y estado de la instancia. Sin secretos ni rutas
+    personales. No incluye el contenido de ningún archivo del proyecto, solo nombres y estados."""
+    import platform
+    filas = doctor(instancia, raiz)
+    version = (Path(raiz) / "VERSION").read_text(encoding="utf-8").strip() if (Path(raiz) / "VERSION").exists() else "?"
+    git = correr(["git", "--version"]) if shutil.which("git") else None
+    paquete = {"paquete": "diagnostico-harness", "version_formato": 1, "harness": version,
+               "python": platform.python_version(), "sistema": f"{platform.system()} {platform.release()}",
+               "git": (git.stdout.strip() if git and git.returncode == 0 else None),
+               "herramientas": {n: bool(shutil.which(n)) for n in ("git", "python3", "gh", "ssh", "node", "docker", "jq")},
+               "doctor": [{"nivel": n, "texto": t, "accion": ac} for n, t, ac in filas],
+               "resumen": {"problemas": sum(1 for f in filas if f[0] == "problema"), "total": len(filas)}}
+    if instancia and (Path(instancia) / "harness.lock").exists():
+        paquete["instancia"] = estado(instancia, raiz)
+    lock = Path(instancia or ".") / "entorno.lock.json"
+    if lock.is_file():
+        try:
+            d = json.loads(lock.read_text(encoding="utf-8"))
+            paquete["entorno_propio"] = {"generador": d.get("generador"), "fecha": d.get("fecha"),
+                                         "modulos": d.get("opciones", {}).get("modulos"), "archivos": len(d.get("archivos", {}))}
+        except (OSError, ValueError):
+            paquete["entorno_propio"] = {"error": "entorno.lock.json ilegible"}
+    return redactar(paquete)
+
+
 def mostrar_doctor(filas, out):
     marca = {"ok": "OK       ", "info": "INFO     ", "problema": "PROBLEMA "}
     col = {"ok": "32", "info": "36", "problema": "31"}
@@ -902,9 +950,12 @@ def cmd_entorno(a, out, raiz):
     herramienta = Path(raiz) / "herramientas" / "harness-entorno.py"
     if not herramienta.is_file():
         raise Detener(f"No encuentro {herramienta}. Actualiza el harness (`harness update`) o indica la raíz con --harness.", 2)
-    args = ["--listar"] if (a.listar or not (a.nombre or a.destino or a.modulos)) else [
-        "--nombre", a.nombre or "", "--destino", a.destino or "", "--modulos", a.modulos or "",
-        "--agentes", a.agentes, "--perfiles", a.perfiles] + (["--aplicar"] if a.aplicar else [])
+    if a.comparar:
+        args = ["--comparar", a.comparar] + (["--aplicar-seguras"] if a.aplicar_seguras else [])
+    else:
+        args = ["--listar"] if (a.listar or not (a.nombre or a.destino or a.modulos)) else [
+            "--nombre", a.nombre or "", "--destino", a.destino or "", "--modulos", a.modulos or "",
+            "--agentes", a.agentes, "--perfiles", a.perfiles] + (["--aplicar"] if a.aplicar else [])
     r = correr([sys.executable, herramienta, *args])
     out.p((r.stdout + r.stderr).rstrip())
     return r.returncode
@@ -1207,6 +1258,7 @@ AYUDA = """Qué comando uso cuándo (mapa completo: docs/MAPA-DE-COMANDOS.md)
        harness aprender listar | ver <id> | descartar <id> --motivo ... | promover <id> --tipo estandar [--aplicar]
        harness entorno --listar                 módulos que puede llevar un entorno propio e independiente
        harness entorno --nombre N --destino D --modulos a,b [--agentes claude,codex] [--aplicar]
+       harness entorno --comparar <carpeta> [--aplicar-seguras]   qué cambió el generador y qué cambiaste tú (nunca pisa lo tuyo)
 
 Nada se escribe sin --aplicar o sin responder «s» a la confirmación. Cada comando acepta -h.
 Códigos de salida: 0 bien · 1 problema o error · 2 detenido (falta algo; el mensaje dice qué) · 130 interrumpido."""
@@ -1215,7 +1267,7 @@ EJEMPLOS = {
     "instalar": "harness instalar mi-equipo/mi-instancia --plan\n  harness instalar mi-equipo/mi-instancia\n  harness instalar ./mi-instancia --modo adopt --proyecto ./mi-proyecto",
     "update": "harness update ./mi-instancia            (muestra el plan)\n  harness update ./mi-instancia --aplicar",
     "montar": "harness montar ./mi-instancia --agentes claude-code\n  harness montar ./mi-instancia --aplicar",
-    "doctor": "harness doctor\n  harness doctor ./mi-instancia --json",
+    "doctor": "harness doctor\n  harness doctor ./mi-instancia --json\n  harness doctor --bundle    (paquete para pegar a quien te ayuda, sin secretos)",
     "estado": "harness estado ./mi-instancia",
     "siguiente": "harness siguiente\n  harness siguiente ./mi-instancia --json",
     "erp": "harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base              (solo muestra la propuesta)\n  harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base --instancia ./mi-instancia --aplicar",
@@ -1376,6 +1428,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             p.add_argument("--agentes", default="claude", help="claude, codex (por coma)")
             p.add_argument("--perfiles", default="", help="estándares de stack a copiar (por coma)")
             p.add_argument("--aplicar", action="store_true", help="escribe el entorno; sin esto solo muestra el plan")
+            p.add_argument("--comparar", metavar="CARPETA", help="compara un entorno ya generado con lo que generaría hoy el harness (solo lectura)")
+            p.add_argument("--aplicar-seguras", action="store_true", help="con --comparar: copia solo lo que no tocaste y el generador mejoró")
         elif sub == "aprender":
             p.add_argument("args", nargs=argparse.REMAINDER, help="acción y argumentos de harness-aprender.py (fuentes, escanear, listar, ver, descartar, promover)")
         elif sub == "ayuda":
@@ -1383,6 +1437,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
         else:
             p.add_argument("instancia", nargs="?", help="carpeta de la instancia (por defecto, la actual)")
             p.add_argument("--json", action="store_true")
+            if sub == "doctor":
+                p.add_argument("--bundle", action="store_true", help="paquete de diagnóstico en JSON para pegar a quien atiende un problema (sin secretos ni rutas personales)")
         a = p.parse_args(argv[1:])
         if a.harness:
             raiz = Path(a.harness).expanduser().resolve()
@@ -1413,6 +1469,10 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
                 print(json.dumps(r, ensure_ascii=False, indent=2), file=salida)
                 return 0 if r["existe"] else 1
             return mostrar_siguiente(r, out)
+        if sub == "doctor" and getattr(a, "bundle", False):
+            inst = base if (a.instancia or (Path(base) / "harness.lock").exists() or (Path(base) / "entorno.lock.json").exists()) else None
+            print(json.dumps(paquete_diagnostico(inst, raiz), ensure_ascii=False, indent=2), file=salida)
+            return 0
         if sub == "doctor":
             filas = doctor(base if (a.instancia or (Path(base) / "harness.lock").exists()) else None, raiz)
             if a.json:

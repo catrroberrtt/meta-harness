@@ -54,6 +54,12 @@ Esqueleto (0.1.x): estructura, contratos de adaptadores, plantilla de convencion
 
 Línea base de 20 comprobaciones previas al lanzamiento (`estandares/seguridad-base.md`): **exigida** en sistemas nuevos (entra como requisitos de la especificación) y **solo marcada** en el análisis de un proyecto existente.
 
+<!-- entorno-propio:inicio -->
+## Entorno propio (independiente)
+
+`harness entorno` genera, a partir de módulos que eliges (documentación primero, compuerta de calidad, autoguardado, aprendizaje con evidencia…), un repositorio que **funciona solo**: otra persona lo clona y lo usa sin instalar este harness. Sin `--aplicar` solo muestra el plan. Guía: `docs/ENTORNO-PROPIO.md`. Qué ideas de referencias externas se rescataron y cuáles quedan pendientes: `docs/REFERENCIAS-EXTERNAS-RESCATE.md`.
+<!-- entorno-propio:fin -->
+
 <!-- opcion-erp:inicio -->
 ## Opción ERP (estado D)
 

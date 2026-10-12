@@ -27,7 +27,7 @@ import tomllib
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "erp", "aprender", "ayuda")
+SUBCOMANDOS = ("instalar", "update", "montar", "doctor", "estado", "siguiente", "trazar", "erp", "aprender", "entorno", "ayuda")
 IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__", ".harness", "dist", "build", ".idea", ".vscode"}
 CODIGO_EXT = {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs", ".kt", ".swift",
               ".c", ".cpp", ".h", ".scala", ".vue", ".sh", ".dart", ".lua"}
@@ -896,6 +896,20 @@ def cmd_aprender(a, out, raiz):
     return r.returncode
 
 
+def cmd_entorno(a, out, raiz):
+    """Delega en herramientas/harness-entorno.py: genera un entorno INDEPENDIENTE (sin enlace con el harness).
+    Sin --aplicar solo muestra el plan."""
+    herramienta = Path(raiz) / "herramientas" / "harness-entorno.py"
+    if not herramienta.is_file():
+        raise Detener(f"No encuentro {herramienta}. Actualiza el harness (`harness update`) o indica la raíz con --harness.", 2)
+    args = ["--listar"] if (a.listar or not (a.nombre or a.destino or a.modulos)) else [
+        "--nombre", a.nombre or "", "--destino", a.destino or "", "--modulos", a.modulos or "",
+        "--agentes", a.agentes, "--perfiles", a.perfiles] + (["--aplicar"] if a.aplicar else [])
+    r = correr([sys.executable, herramienta, *args])
+    out.p((r.stdout + r.stderr).rstrip())
+    return r.returncode
+
+
 # ------------------------------------------------------------------ instalar / update
 DESCARGADORES = []
 """PUNTO DE EXTENSION de la descarga remota (otro agente). Cada elemento es una funcion `f(origen: str) -> Path | None`
@@ -1191,6 +1205,8 @@ AYUDA = """Qué comando uso cuándo (mapa completo: docs/MAPA-DE-COMANDOS.md)
        harness aprender fuentes agregar <nombre> <ruta> --tipo erp|instancia   registra de dónde aprender (solo lectura)
        harness aprender escanear                separa lo general de lo del negocio y arma la cola
        harness aprender listar | ver <id> | descartar <id> --motivo ... | promover <id> --tipo estandar [--aplicar]
+       harness entorno --listar                 módulos que puede llevar un entorno propio e independiente
+       harness entorno --nombre N --destino D --modulos a,b [--agentes claude,codex] [--aplicar]
 
 Nada se escribe sin --aplicar o sin responder «s» a la confirmación. Cada comando acepta -h.
 Códigos de salida: 0 bien · 1 problema o error · 2 detenido (falta algo; el mensaje dice qué) · 130 interrumpido."""
@@ -1204,6 +1220,7 @@ EJEMPLOS = {
     "siguiente": "harness siguiente\n  harness siguiente ./mi-instancia --json",
     "erp": "harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base              (solo muestra la propuesta)\n  harness erp --negocio ./documentos-del-negocio --erp-base ./erp-base --instancia ./mi-instancia --aplicar",
     "trazar": "harness trazar cambios/2026-01-10-entregas-parciales\n  harness trazar cambios/2026-01-10-entregas-parciales --etapa delegacion\n  harness trazar cambios/2026-01-10-entregas-parciales --repo ./mi-proyecto",
+    "entorno": "harness entorno --listar\n  harness entorno --nombre mi-entorno --destino ~/mi-entorno --modulos documentacion-primero,compuerta-calidad,autoguardado\n  (añade --aplicar para escribirlo)",
     "aprender": "harness aprender fuentes agregar erp-base ./erp-base --tipo erp\n  harness aprender escanear\n  harness aprender listar\n  harness aprender promover <id> --tipo estandar --aplicar",
 }
 DESCRIPCION = {
@@ -1214,6 +1231,7 @@ DESCRIPCION = {
     "estado": "Muestra modo, versión, qué hay instalado, qué cambió después y qué falta del piso.",
     "siguiente": "Dónde estoy y qué sigue: estado de la carpeta o instancia y pasos sugeridos, en orden. Solo lectura.",
     "trazar": "Comprueba la trazabilidad de un cambio (especificación, delegación, matriz, cierre). Solo lectura.",
+    "entorno": "Entorno propio: genera un repositorio independiente (hooks, compuerta, autoguardado, aprendizaje con evidencia) que otra persona usa SIN el meta-harness. Sin --aplicar solo muestra el plan.",
     "aprender": "Aprendizaje: registra fuentes (un ERP central, una instancia), separa lo general de lo del negocio y deja una cola de aportes para revisar. Nunca sube nada.",
     "erp": "Opción ERP: lee los documentos del negocio (archivos locales), propone producto y módulos del ERP estándar con su estado real y, solo si confirmas, deja la propuesta en la instancia. No instala ni copia nada del ERP.",
 }
@@ -1350,6 +1368,14 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             p.add_argument("--si", action="store_true", help="igual que --aplicar")
             p.add_argument("--no-interactivo", action="store_true", help="no pregunta: muestra la propuesta y sale sin escribir")
             p.add_argument("--json", action="store_true", help="una sola salida JSON (no interactivo)")
+        elif sub == "entorno":
+            p.add_argument("--listar", action="store_true", help="muestra módulos, agentes y perfiles disponibles")
+            p.add_argument("--nombre", help="nombre del entorno (minúsculas, números y guiones)")
+            p.add_argument("--destino", help="carpeta nueva donde se genera (no puede estar dentro del harness)")
+            p.add_argument("--modulos", help="módulos separados por coma (mira --listar)")
+            p.add_argument("--agentes", default="claude", help="claude, codex (por coma)")
+            p.add_argument("--perfiles", default="", help="estándares de stack a copiar (por coma)")
+            p.add_argument("--aplicar", action="store_true", help="escribe el entorno; sin esto solo muestra el plan")
         elif sub == "aprender":
             p.add_argument("args", nargs=argparse.REMAINDER, help="acción y argumentos de harness-aprender.py (fuentes, escanear, listar, ver, descartar, promover)")
         elif sub == "ayuda":
@@ -1369,6 +1395,8 @@ def main(argv=None, entrada=None, salida=None, interactivo=None, raiz=None):
             return cmd_montar(a, out, raiz)
         if sub == "trazar":
             return cmd_trazar(a, out, raiz)
+        if sub == "entorno":
+            return cmd_entorno(a, out, raiz)
         if sub == "aprender":
             return cmd_aprender(a, out, raiz)
         if sub == "erp":

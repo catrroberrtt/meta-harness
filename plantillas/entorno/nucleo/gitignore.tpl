@@ -1,0 +1,8 @@
+.entorno/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.pem
+*.key
+node_modules/

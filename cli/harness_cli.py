@@ -953,12 +953,12 @@ def es_repositorio(origen):
         return False
     if origen.startswith(("https://", "ssh://", "http://", "git@")):
         return True
-    return bool(OWNER_NOMBRE.match(origen)) and not origen.startswith(("./", "../", "~"))
+    return bool(OWNER_NOMBRE.fullmatch(origen)) and not origen.startswith(("./", "../", "~"))
 
 
 def resolver_repositorio(origen, out):
     """owner/nombre -> git@github.com:owner/nombre.git (avisando). Limpia usuario:token@ de las URL."""
-    if OWNER_NOMBRE.match(origen) and "://" not in origen:
+    if OWNER_NOMBRE.fullmatch(origen) and "://" not in origen:
         url = f"git@github.com:{origen}.git"
         out.p(f"Aviso: «{origen}» se interpretó como {url} (GitHub por SSH, con tu llave existente). "
               "Si es otro servidor, pasa la URL completa.")

@@ -149,7 +149,7 @@ def validar(p, ruta):
                "(archivo_env, host, puerto, base): no se asumen nombres de variables.")
         for k in ("archivo_env", "host", "puerto", "base", "contrasena"):
             if v.get(k):
-                exigir(PATRON_IDENT.match(v[k]), f"variables.{k}: valor no permitido {v[k]!r}.")
+                exigir(PATRON_IDENT.fullmatch(v[k]), f"variables.{k}: valor no permitido {v[k]!r}.")
     return escribibles[0] if escribibles else None
 
 
@@ -222,7 +222,7 @@ def construir(p, ruta_politica):
     mot = datos.get("motores_solo_lectura") or {}
     motores = lista_texto(mot.get("scripts"), "datos.motores_solo_lectura.scripts", re.compile(r"^[A-Za-z0-9_./-]+$"))
     pin = mot.get("archivo_sha256", "")
-    exigir(not pin or re.match(r"^[A-Za-z0-9_./~-]+$", pin), "datos.motores_solo_lectura.archivo_sha256: ruta no permitida.")
+    exigir(not pin or re.fullmatch(r"^[A-Za-z0-9_./~-]+$", pin), "datos.motores_solo_lectura.archivo_sha256: ruta no permitida.")
     if pin.startswith("~/"):
         pin = "$HOME/" + pin[2:]
 

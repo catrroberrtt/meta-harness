@@ -23,17 +23,25 @@ paso "4. cada módulo declarado tiene sus archivos"
 python3 - <<'PY' || mal "módulos"
 import tomllib, pathlib
 mods = tomllib.load(open("entorno.toml", "rb"))["entorno"]["modulos"]
-req = {"documentacion-primero": ["scripts/buscar-documentacion.py", "hooks/documentacion-primero.sh"],
-       "compuerta-calidad": ["scripts/gate.sh", "hooks/gate-antes-de-commit.sh"],
+req = {"documentacion-primero": ["scripts/buscar-documentacion.py", "hooks/documentacion-primero.py", "hooks/_comandos.py"],
+       "compuerta-calidad": ["scripts/gate.sh", "hooks/gate-antes-de-commit.py", "hooks/_comandos.py"],
        "conocimiento": ["knowledge/INDICE.md", "scripts/frescura.py"],
        "escaneo-secretos": ["scripts/escanear-secretos.py"],
        "autoguardado": ["scripts/autoguardar.py", "hooks/autoguardado.sh"],
        "aprendizaje": ["scripts/aprender.py", "knowledge/aprendizaje.md"],
-       "publicar-solo-verificado": ["scripts/verificar-publicacion.py", "hooks/publicar-solo-verificado.py", "docs/revisor-independiente.md"]}
+       "publicar-solo-verificado": ["scripts/verificar-publicacion.py", "hooks/publicar-solo-verificado.py", "docs/revisor-independiente.md", "hooks/_comandos.py"]}
 faltan = [f for m in mods for f in req.get(m, []) if not pathlib.Path(f).exists()]
 assert not faltan, faltan
 print("   ok")
 PY
 paso "5. escaneo de secretos (si el módulo está)"
 if [ -f scripts/escanear-secretos.py ]; then python3 scripts/escanear-secretos.py || mal "secretos"; else echo "   (módulo no elegido)"; fi
-echo; [ "$FALLOS" -eq 0 ] && { echo "TODO OK"; exit 0; } || { echo "$FALLOS comprobación(es) fallaron"; exit 1; }
+echo
+if [ "$FALLOS" -eq 0 ]; then echo "TODO OK"; exit 0; fi
+echo "$FALLOS comprobación(es) fallaron"
+echo
+echo "Siguiente:"
+echo "  - falla un .sh o .py: corrige la sintaxis del archivo que se nombra arriba"
+echo "  - falla entorno.toml o los módulos: compara con docs/ORIGEN.md y revisa que no borraste un archivo del módulo"
+echo "  - falla el escaneo de secretos: quita el secreto del archivo (y rota la clave si ya se subió); si es un falso positivo, añade «# entorno:permitir» en esa línea"
+exit 1

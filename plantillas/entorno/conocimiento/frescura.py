@@ -22,4 +22,6 @@ for carpeta in ("docs", "knowledge"):
 for ruta, exceso in vencidos:
     print(f"VENCIDO hace {exceso} d: {ruta}")
 print(f"{len(vencidos)} documento(s) vencido(s)")
+if vencidos:
+    print("Siguiente: relee el documento, corrígelo si cambió la realidad y actualiza su marca «revisado: AAAA-MM-DD» (no basta con cambiar la fecha).")
 sys.exit(1 if vencidos else 0)

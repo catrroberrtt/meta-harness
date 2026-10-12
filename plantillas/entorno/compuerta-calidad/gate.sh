@@ -24,4 +24,6 @@ if [ -f scripts/escanear-secretos.py ]; then
   echo "== escaneo de secretos"; python3 scripts/escanear-secretos.py || FALLOS=$((FALLOS+1))
 fi
 if [ "$FALLOS" -eq 0 ]; then mkdir -p .entorno && date +%s > .entorno/gate-ok; echo "COMPUERTA OK"; exit 0; fi
-echo "COMPUERTA FALLÓ ($FALLOS)"; exit 1
+echo "COMPUERTA FALLÓ ($FALLOS)"
+echo "Siguiente: corrige lo que se muestra arriba y vuelve a correr scripts/gate.sh. Si un comando de [gate].comandos no debería estar, edítalo en entorno.toml."
+exit 1

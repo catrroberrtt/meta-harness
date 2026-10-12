@@ -18,6 +18,7 @@ import re
 import shutil
 import stat
 import sys
+import tomllib
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 PLANTILLAS = RAIZ / "plantillas" / "entorno"
@@ -28,15 +29,17 @@ MODULOS = {
     "documentacion-primero": {
         "descripcion": "Documentación antes que código y datos; buscador y recordatorio automático",
         "archivos": [("buscar-documentacion.py", "scripts/buscar-documentacion.py"),
-                     ("documentacion-primero.sh", "hooks/documentacion-primero.sh")],
+                     ("documentacion-primero.py", "hooks/documentacion-primero.py"),
+                     ("../nucleo/_comandos.py", "hooks/_comandos.py")],
         "requiere": [],
-        "hooks": [("UserPromptSubmit", "", "documentacion-primero.sh")],
+        "hooks": [("UserPromptSubmit", "", "documentacion-primero.py")],
     },
     "compuerta-calidad": {
         "descripcion": "Compuerta antes de entregar (tus comandos + secretos) y aviso antes de commitear",
-        "archivos": [("gate.sh", "scripts/gate.sh"), ("gate-antes-de-commit.sh", "hooks/gate-antes-de-commit.sh")],
+        "archivos": [("gate.sh", "scripts/gate.sh"), ("gate-antes-de-commit.py", "hooks/gate-antes-de-commit.py"),
+                     ("../nucleo/_comandos.py", "hooks/_comandos.py")],
         "requiere": ["escaneo-secretos"],
-        "hooks": [("PreToolUse", "Bash", "gate-antes-de-commit.sh")],
+        "hooks": [("PreToolUse", "Bash", "gate-antes-de-commit.py")],
     },
     "conocimiento": {
         "descripcion": "Índice del conocimiento y control de frescura de los documentos",
@@ -60,13 +63,14 @@ MODULOS = {
         "descripcion": "Nada se publica (PR, comentario, nota de versión) sin verificar el texto contra sus fuentes",
         "archivos": [("verificar-publicacion.py", "scripts/verificar-publicacion.py"),
                      ("revisor-independiente.md", "docs/revisor-independiente.md"),
-                     ("publicar-solo-verificado.py", "hooks/publicar-solo-verificado.py")],
+                     ("publicar-solo-verificado.py", "hooks/publicar-solo-verificado.py"),
+                     ("../nucleo/_comandos.py", "hooks/_comandos.py")],
         "requiere": [],
         "hooks": [("PreToolUse", "Bash", "publicar-solo-verificado.py")],
         "toml": """
 [publicar]
 # Comandos que publican texto hacia otras personas. El hook exige la marca de verificación del texto exacto.
-comandos = ["gh pr create", "gh pr edit", "gh pr comment", "gh issue create", "gh issue comment", "gh release create"]
+comandos = ["gh pr create", "gh pr edit", "gh pr comment", "gh pr review", "gh pr merge", "gh issue create", "gh issue comment", "gh issue edit", "gh release create", "gh release edit"]
 # 1 = comprobación mecánica; 2 = además, revisión independiente (docs/revisor-independiente.md).
 exigir_nivel = 1
 ttl_horas = 3
@@ -97,6 +101,33 @@ AGENTES = {"claude": "Claude Code", "codex": "Codex (lee AGENTS.md)"}
 NOMBRE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
 
 
+def perfiles_disponibles():
+    base = RAIZ / "perfiles"
+    return sorted(p.name for p in base.iterdir() if p.is_dir() and not p.name.startswith("_")) if base.is_dir() else []
+
+
+def inspeccionar(archivos):
+    """Inspección previa a escribir (el generado no se escribe si no se puede interpretar): entorno.toml y settings.json
+    deben parsear y el nombre/módulos/agentes del TOML deben ser exactamente los pedidos. Devuelve lista de problemas."""
+    problemas = []
+    try:
+        cfg = tomllib.loads(archivos["entorno.toml"])
+        if set(cfg["entorno"]["modulos"]) - set(MODULOS):
+            problemas.append("entorno.toml declara módulos que no existen")
+    except (tomllib.TOMLDecodeError, KeyError) as e:
+        problemas.append(f"entorno.toml generado no es válido: {e}")
+    if ".claude/settings.json" in archivos:
+        try:
+            json.loads(archivos[".claude/settings.json"])
+        except ValueError as e:
+            problemas.append(f".claude/settings.json generado no es válido: {e}")
+    for ruta in archivos:
+        pr = pathlib.PurePosixPath(ruta)
+        if pr.is_absolute() or ".." in pr.parts:
+            problemas.append(f"ruta de salida fuera del destino: {ruta}")
+    return problemas
+
+
 def resolver(modulos):
     """Agrega las dependencias y devuelve (lista ordenada, agregados)."""
     final, agregados = [], []
@@ -112,7 +143,7 @@ def resolver(modulos):
 
 def validar(a):
     errores = []
-    if not NOMBRE.match(a.nombre or ""):
+    if not NOMBRE.fullmatch(a.nombre or ""):  # fullmatch: con `$` un salto de línea final pasaba y corrompía entorno.toml
         errores.append("--nombre: minúsculas, números y guiones, de 2 a 41 caracteres, sin empezar por guion")
     mods = [m for m in (a.modulos or "").split(",") if m]
     if not mods:
@@ -125,9 +156,10 @@ def validar(a):
         if x not in AGENTES:
             errores.append(f"agente desconocido: «{x}» (disponibles: {', '.join(AGENTES)})")
     pers = [p for p in (a.perfiles or "").split(",") if p]
+    disponibles = perfiles_disponibles()
     for p in pers:
-        if not (RAIZ / "perfiles" / p).is_dir() or p.startswith("_"):
-            errores.append(f"perfil desconocido: «{p}»")
+        if p not in disponibles:  # lista cerrada: un nombre como «../x» nunca se interpreta como ruta
+            errores.append(f"perfil desconocido: «{p}» (disponibles: {', '.join(disponibles)})")
     if a.destino:
         d = pathlib.Path(a.destino).expanduser().resolve()
         if d == RAIZ or RAIZ in d.parents:
@@ -218,6 +250,11 @@ def main(argv=None):
         return 2
     final, agregados = resolver(mods)
     archivos = construir(a, mods, ags, pers)
+    problemas = inspeccionar(archivos)
+    if problemas:
+        for pr in problemas:
+            print("ERROR (inspección previa):", pr, file=sys.stderr)
+        return 2
     destino = pathlib.Path(a.destino).expanduser().resolve()
     print(f"Entorno «{a.nombre}» → {destino}")
     print(f"  módulos: {', '.join(final)}" + (f"  (agregados por dependencia: {', '.join(agregados)})" if agregados else ""))

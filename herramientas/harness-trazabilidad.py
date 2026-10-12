@@ -334,7 +334,7 @@ def analizar_matriz(inf, carpeta, spec, idx, repo):
             inf.error("T47", donde, f"{ca or rq}: sigue «{estado}»; para cerrar debe estar verificado o no-verificado con motivo")
         if repo is not None:
             for h in partir(commit, r"[,;\s]+"):
-                if not RE_HASH.match(h):
+                if not RE_HASH.fullmatch(h):
                     inf.error("T48", donde, f"commit con formato no válido: «{h}»")
                 elif git_ok and not git_commit_existe(repo, h):
                     inf.error("T48", donde, f"el commit {h} no existe en {repo}")

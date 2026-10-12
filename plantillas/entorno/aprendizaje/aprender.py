@@ -20,6 +20,20 @@ CAB = ("# Lecciones aprendidas\n\n<!-- revisado: {f} · vence: 90d -->\n\n"
        "Formato por nota: `N. [estado] [tipo] fecha · texto · evidencia: …`. Estados: nota, regla, revertida.\n\n")
 
 
+MAX_TEXTO = 300
+PROHIBIDO = re.compile(r"[\x00-\x1f\x7f\u2028\u2029]|<!--|-->")
+
+
+def limpio(campo, nombre):
+    """Una nota es UNA línea de texto plano. Un salto de línea o un marcador HTML permitiría forjar otras notas o escribir
+    fuera de su sitio en AGENTS.md (que el agente lee como instrucciones), así que se rechaza, no se corrige en silencio."""
+    if PROHIBIDO.search(campo):
+        sys.exit(f"{nombre} rechazado: no puede tener saltos de línea, caracteres de control ni marcadores «<!--» / «-->».")
+    if len(campo) > MAX_TEXTO:
+        sys.exit(f"{nombre} rechazado: supera {MAX_TEXTO} caracteres. Resúmelo y guarda el detalle en un documento.")
+    return campo.strip()
+
+
 def leer():
     if not NOTAS.exists():
         return []
@@ -46,6 +60,9 @@ def main():
     a = ap.parse_args()
     ls = leer()
     if a.cmd == "nota":
+        a.texto, a.evidencia = limpio(a.texto, "El texto"), limpio(a.evidencia, "La evidencia")
+        if not a.texto:
+            sys.exit("El texto no puede estar vacío.")
         num = len(ls) + 1
         ev = f" · evidencia: {a.evidencia}" if a.evidencia else ""
         ls.append(f"{num}. [nota] [{a.tipo}] {dt.date.today()} · {a.texto}{ev}")
@@ -66,6 +83,10 @@ def main():
         print("la nota no se pudo interpretar", file=sys.stderr)
         return 2
     num, estado, tipo, fecha, texto, ev = p
+    if int(num) != a.numero or PROHIBIDO.search(texto + (ev or "")):
+        print(f"La línea {a.numero} del archivo de lecciones no es una nota válida (número distinto o contenido no permitido): "
+              "revisa knowledge/aprendizaje.md a mano.", file=sys.stderr)
+        return 2
     marca = f"<!-- regla {num} -->"
     ag = AGENTES.read_text(encoding="utf8")
     if INI not in ag or FIN not in ag:

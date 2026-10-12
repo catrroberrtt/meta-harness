@@ -211,7 +211,7 @@ def _faltan(recurso, metodo, que):
 
 
 def _host_ok(v):
-    return isinstance(v, str) and PATRON_HOST.match(v) is not None
+    return isinstance(v, str) and PATRON_HOST.fullmatch(v) is not None
 
 
 def _puerto_ok(v):
@@ -274,7 +274,7 @@ def comprobar_nube(cfg, s, t):
         return _faltan(rec, m, "una identidad de nube con permisos de solo lectura (perfil SSO, rol o claves de entorno)")
     if m == "claves_entorno":
         nombres = cfg.get("variables") or []
-        if not nombres or not all(isinstance(n, str) and PATRON_NOMBRE.match(n) for n in nombres):
+        if not nombres or not all(isinstance(n, str) and PATRON_NOMBRE.fullmatch(n) for n in nombres):
             return _faltan(rec, m, "declarar los NOMBRES de las variables de entorno que se usaran (nunca sus valores)")
         ausentes = [n for n in nombres if not s.variable_entorno(n)]
         if ausentes:
@@ -283,7 +283,7 @@ def comprobar_nube(cfg, s, t):
     if not s.comando("aws"):
         return _faltan(rec, m, "instalar la CLI de la nube")
     perfil = cfg.get("perfil")
-    if not isinstance(perfil, str) or not PATRON_NOMBRE.match(perfil):
+    if not isinstance(perfil, str) or not PATRON_NOMBRE.fullmatch(perfil):
         return _faltan(rec, m, "declarar el NOMBRE del perfil de nube")
     if not s.perfil_nube(perfil):
         return _faltan(rec, m, f"configurar el perfil '{perfil}' (SSO o rol asumido) con el alta que te indique el responsable")

@@ -35,6 +35,7 @@ def main():
             archivos += [p for p in sorted(base.rglob("*")) if p.is_file() and p.suffix in EXT]
     if not archivos:
         print("No hay documentación en las rutas configuradas: eso también es un dato. Pregunta a la persona.")
+        print("Siguiente: si la documentación vive en otra carpeta, agrégala en [documentacion].rutas de entorno.toml.")
         return 0
     for t in a.terminos:
         print(f"### {t}")

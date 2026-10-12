@@ -190,6 +190,8 @@ def main():
             cab + "\n" + "\n".join(f"C{i + 1:02d}. {c}" for i, c in enumerate(cl)) + "\n", encoding="utf8")
         if fallas:
             print(f"\nNIVEL 1: NO PASA ({len(fallas)} fallas). Corrige el texto y vuelve a correr; no se publica.")
+            print("Siguiente: una ruta nueva o ajena se marca con «(nuevo)» o «(externo)»; un estado que no coincide se corrige "
+                  "en el texto o se confirma con la fuente; un secreto se quita del texto.")
             return 1
         escribir_marca(texto, 1)
         print(f"\nNIVEL 1: pasa (sha {h}). {len(cl)} afirmaciones para revisión independiente en {ruta}.afirmaciones.md "

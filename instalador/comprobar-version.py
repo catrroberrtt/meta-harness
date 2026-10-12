@@ -24,7 +24,7 @@ def git(raiz, *a):
 
 
 def ver(s):
-    m = SEMVER.match((s or "").strip().lstrip("v"))
+    m = SEMVER.fullmatch((s or "").strip().lstrip("v"))
     return tuple(int(x) for x in m.groups()) if m else None
 
 

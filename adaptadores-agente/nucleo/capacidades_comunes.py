@@ -80,7 +80,7 @@ def skills_neutrales(harness_raiz=None):
         previos = len(errores)
         if not nombre:
             errores.append(f"{rel}: falta `name` en la cabecera (---).")
-        elif not REGEX_NOMBRE.match(nombre) or len(nombre) > MAX_NOMBRE:
+        elif not REGEX_NOMBRE.fullmatch(nombre) or len(nombre) > MAX_NOMBRE:
             errores.append(f"{rel}: `name` {nombre!r} no cumple ^[a-z0-9]+(-[a-z0-9]+)*$ (máximo {MAX_NOMBRE} caracteres).")
         elif nombre != d.name:
             errores.append(f"{rel}: `name` ({nombre!r}) debe coincidir con la carpeta ({d.name!r}).")
@@ -103,7 +103,7 @@ def comandos_neutrales(harness_raiz=None):
         rel = f"plantillas/comandos/{f.name}"
         texto = f.read_text(encoding="utf-8")
         fm, _ = _frontmatter(texto)
-        if not REGEX_NOMBRE.match(f.stem):
+        if not REGEX_NOMBRE.fullmatch(f.stem):
             errores.append(f"{rel}: el nombre del archivo debe cumplir ^[a-z0-9]+(-[a-z0-9]+)*$.")
         elif not fm.get("description"):
             errores.append(f"{rel}: falta `description` en la cabecera.")
@@ -254,7 +254,7 @@ def mcp_desde_politica(p):
             ref = f"mcp.servidores[{i}] ({nombre})"
         for k in sorted(set(s) - CLAVES_SERVIDOR):
             errores.append(f"{ref}: clave desconocida `{k}` (permitidas: {', '.join(sorted(CLAVES_SERVIDOR))}).")
-        if not isinstance(nombre, str) or not REGEX_NOMBRE.match(nombre):
+        if not isinstance(nombre, str) or not REGEX_NOMBRE.fullmatch(nombre):
             errores.append(f"{ref}: `nombre` debe ser texto en minúsculas, números y guiones (^[a-z0-9]+(-[a-z0-9]+)*$); se recibió {nombre!r}.")
         elif nombre in vistos:
             errores.append(f"{ref}: nombre de servidor repetido.")
@@ -266,7 +266,7 @@ def mcp_desde_politica(p):
         if comando is not None and (not isinstance(comando, str) or not comando or re.search(r"\s", comando)):
             errores.append(f"{ref}: `comando` debe ser el ejecutable, sin espacios; los argumentos van en `args`.")
         if url is not None:
-            if not isinstance(url, str) or not re.match(r"^https?://[^\s]+$", url):
+            if not isinstance(url, str) or not re.fullmatch(r"^https?://[^\s]+$", url):
                 errores.append(f"{ref}: `url` debe ser una dirección http(s) sin espacios.")
             elif _parece_secreto(url):
                 errores.append(f"{ref}: `url` contiene algo con aspecto de secreto (usuario:clave@ o token); usa una referencia `${{VARIABLE}}` o declara el servidor sin credenciales en la dirección.")
@@ -275,7 +275,7 @@ def mcp_desde_politica(p):
             errores.append(f"{ref}: `args` debe ser una lista de textos.")
             args = []
         for j, a in enumerate(args):
-            if _parece_secreto(a) and not REF_VARIABLE.match(a):
+            if _parece_secreto(a) and not REF_VARIABLE.fullmatch(a):
                 errores.append(f"{ref}: args[{j}] tiene aspecto de secreto (valor omitido); pásalo por `entorno` como referencia `${{VARIABLE}}`.")
         entorno_neutral = []
         entorno = s.get("entorno", {})
@@ -283,10 +283,10 @@ def mcp_desde_politica(p):
             errores.append(f"{ref}: `entorno` debe ser una tabla CLAVE = \"${{VARIABLE}}\".")
             entorno = {}
         for clave, valor in entorno.items():
-            if not NOMBRE_ENTORNO.match(str(clave)):
+            if not NOMBRE_ENTORNO.fullmatch(str(clave)):
                 errores.append(f"{ref}: entorno.{clave}: el nombre de la variable no es válido.")
                 continue
-            m = REF_VARIABLE.match(valor) if isinstance(valor, str) else None
+            m = REF_VARIABLE.fullmatch(valor) if isinstance(valor, str) else None
             if m:
                 entorno_neutral.append({"clave": clave, "variable": m.group(1)})
             elif _parece_secreto(valor, opaco=True):

@@ -44,6 +44,9 @@ def main():
     for h in hallazgos:
         print("SECRETO?", h)
     print(f"escaneo de secretos: {len(hallazgos)} hallazgo(s)")
+    if hallazgos:
+        print("Siguiente: quita el secreto del archivo y, si ya estuvo en un commit o se subió, rota la clave. "
+              "Si es un falso positivo, añade «# entorno:permitir» en esa línea.")
     return 1 if hallazgos else 0
 
 

@@ -187,13 +187,13 @@ def validar_entorno(datos):
             errores.append("%s: debe ser una tabla." % d); continue
         _desconocidas(e, {"comando", "para", "instalar_apt", "obligatorio"}, errores, d)
         cmd, para = _texto(e, "comando", errores, d), _texto(e, "para", errores, d)
-        if cmd and not COMANDO_OK.match(cmd):
+        if cmd and not COMANDO_OK.fullmatch(cmd):
             errores.append("%s: «comando» solo admite letras, numeros y . _ + - (recibido «%s»)." % (d, cmd)); cmd = None
         apt = e.get("instalar_apt")
         paquetes = []
         if apt is not None:
             paquetes = apt.split() if isinstance(apt, str) else apt
-            if not isinstance(paquetes, list) or not paquetes or not all(isinstance(x, str) and PAQUETE_APT.match(x) for x in paquetes):
+            if not isinstance(paquetes, list) or not paquetes or not all(isinstance(x, str) and PAQUETE_APT.fullmatch(x) for x in paquetes):
                 errores.append("%s: «instalar_apt» debe ser nombres de paquetes apt (texto separado por espacios o lista); recibido «%s»." % (d, apt))
                 paquetes = []
         obligatorio = _bool(e, "obligatorio", True, errores, d)
@@ -205,7 +205,7 @@ def validar_entorno(datos):
             errores.append("%s: debe ser una tabla." % d); continue
         _desconocidas(e, {"remoto", "destino", "confirmacion"}, errores, d)
         remoto, destino = _texto(e, "remoto", errores, d), _texto(e, "destino", errores, d)
-        if remoto and (CRED.search(remoto) or not (OWNER_NOMBRE.match(remoto) or re.match(r"^(https://|ssh://|git@)[^\s]+$", remoto))):
+        if remoto and (CRED.search(remoto) or not (OWNER_NOMBRE.fullmatch(remoto) or re.fullmatch(r"^(https://|ssh://|git@)[^\s]+$", remoto))):
             errores.append("%s: «remoto» debe ser owner/nombre o una URL https/ssh sin credenciales (recibido «%s»)." % (d, sin_credenciales(remoto))); remoto = None
         if destino and not ruta_relativa_ok(destino):
             errores.append("%s: «destino» debe ser una ruta relativa que no salga de la base (recibido «%s»)." % (d, destino)); destino = None
@@ -322,7 +322,7 @@ class Orquestador:
     # ---- entrada
     def resolver(self):
         o = self.a.instancia
-        if OWNER_NOMBRE.match(o) and "://" not in o:
+        if OWNER_NOMBRE.fullmatch(o) and "://" not in o:
             self.url = "git@github.com:%s.git" % o
         else:
             self.url = sin_credenciales(o)
@@ -421,7 +421,7 @@ class Orquestador:
 
     def instalar_apt(self, paquetes, etiqueta):
         """UN solo `sudo apt update && apt install -y ...`, con una confirmacion de administrador (nunca se salta)."""
-        if not all(PAQUETE_APT.match(p) for p in paquetes):
+        if not all(PAQUETE_APT.fullmatch(p) for p in paquetes):
             self.dec("  Nombre de paquete no valido: no ejecuto nada.")
             return 4
         texto = self.texto_apt(paquetes)
@@ -607,11 +607,11 @@ class Orquestador:
             if not self.confirmar("  ¿Clonar los %d repositorios que piden confirmacion?" % len(con)):
                 autorizados = [x for x in pendientes if not x[0]["confirmacion"]]
                 for r, d, _ in con:
-                    url = "git@github.com:%s.git" % r["remoto"] if OWNER_NOMBRE.match(r["remoto"]) else r["remoto"]
+                    url = "git@github.com:%s.git" % r["remoto"] if OWNER_NOMBRE.fullmatch(r["remoto"]) else r["remoto"]
                     self.pend("clonar %s" % r["destino"], "git clone %s %s" % (url, d))
                 resultado = 2
         for r, destino, clave in autorizados:
-            url = "git@github.com:%s.git" % r["remoto"] if OWNER_NOMBRE.match(r["remoto"]) else sin_credenciales(r["remoto"])
+            url = "git@github.com:%s.git" % r["remoto"] if OWNER_NOMBRE.fullmatch(r["remoto"]) else sin_credenciales(r["remoto"])
             destino.parent.mkdir(parents=True, exist_ok=True)
             codigo, salida = self.s.ejecutar(["git", "clone", "--quiet", url, str(destino)])
             if codigo != 0:

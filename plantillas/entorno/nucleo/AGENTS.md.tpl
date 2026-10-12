@@ -16,6 +16,8 @@ Este archivo lo lee el agente al empezar. Es corto a propósito: el detalle vive
 - No se sube a una rama protegida ni se borra historial sin que la persona lo pida en ese momento.
 - «Verificado» solo si se ejecutó y se vio el resultado.
 
+{{reglas_modulos}}
+
 ## Cuando te corrijan
 
 Registra la corrección con `python3 scripts/aprender.py nota "qué pasó y qué regla sale" --evidencia "dónde se ve"`.

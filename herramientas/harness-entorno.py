@@ -56,6 +56,36 @@ MODULOS = {
         "requiere": ["escaneo-secretos"],
         "hooks": [("Stop", "", "autoguardado.sh")],
     },
+    "publicar-solo-verificado": {
+        "descripcion": "Nada se publica (PR, comentario, nota de versión) sin verificar el texto contra sus fuentes",
+        "archivos": [("verificar-publicacion.py", "scripts/verificar-publicacion.py"),
+                     ("revisor-independiente.md", "docs/revisor-independiente.md"),
+                     ("publicar-solo-verificado.py", "hooks/publicar-solo-verificado.py")],
+        "requiere": [],
+        "hooks": [("PreToolUse", "Bash", "publicar-solo-verificado.py")],
+        "toml": """
+[publicar]
+# Comandos que publican texto hacia otras personas. El hook exige la marca de verificación del texto exacto.
+comandos = ["gh pr create", "gh pr edit", "gh pr comment", "gh issue create", "gh issue comment", "gh release create"]
+# 1 = comprobación mecánica; 2 = además, revisión independiente (docs/revisor-independiente.md).
+exigir_nivel = 1
+ttl_horas = 3
+
+# De dónde sale la verdad de cada referencia. Un bloque por tipo; el comando recibe el identificador en {id}, debe
+# terminar con 0 si existe e imprimir el estado en la primera línea. Ejemplo (descomenta y adapta):
+# [[publicar.referencias]]
+# nombre = "ticket"
+# patron = "[A-Z]+-[0-9]+"
+# comprobar = ["./scripts/estado-ticket.sh", "{id}"]
+# estados_cerrados = ["DONE", "CERRADO"]
+""",
+        "regla": """## Antes de publicar texto
+
+Nada sale hacia otras personas (PR, comentario, nota de versión) sin verificación. Escribe el texto en un archivo,
+corre `python3 scripts/verificar-publicacion.py revisar <archivo>` y publica con `--body-file <archivo>`. Editar el texto
+invalida la verificación. Lo que no se pudo comprobar se escribe en el texto como pendiente, no como hecho.
+""",
+    },
     "aprendizaje": {
         "descripcion": "Lecciones con evidencia: no hay regla sin evidencia y toda regla se revierte",
         "archivos": [("aprender.py", "scripts/aprender.py"), ("aprendizaje.md.tpl", "knowledge/aprendizaje.md")],
@@ -129,11 +159,15 @@ def construir(a, mods, ags, pers):
                          if ags else "Cualquier agente que lea `AGENTS.md` funciona; los hooks son opcionales."),
     }
     out = {}
+    v["reglas_modulos"] = "".join(MODULOS[m].get("regla", "") + "\n" for m in final if MODULOS[m].get("regla")).rstrip("\n")
     nuc = PLANTILLAS / "nucleo"
     for src, dst in [("README.md.tpl", "README.md"), ("AGENTS.md.tpl", "AGENTS.md"), ("entorno.toml.tpl", "entorno.toml"),
                      ("gitignore.tpl", ".gitignore"), ("ORIGEN.md.tpl", "docs/ORIGEN.md"),
                      ("instalar.sh.tpl", "instalar.sh"), ("verificar.sh.tpl", "verificar.sh")]:
         out[dst] = sustituir((nuc / src).read_text(encoding="utf8"), v)
+    for m in final:
+        if MODULOS[m].get("toml"):
+            out["entorno.toml"] += MODULOS[m]["toml"]
     out["LICENSE"] = (RAIZ / "LICENSE").read_text(encoding="utf8")
     out["NOTICE"] = (f"{a.nombre}\n\nEste entorno incluye scripts y plantillas generados con meta-harness {VERSION} "
                      f"(Apache License 2.0, ver LICENSE).\n")
@@ -148,7 +182,8 @@ def construir(a, mods, ags, pers):
         for evento, lst in hooks.items():
             cfg["hooks"][evento] = [{
                 **({"matcher": h["matcher"]} if h["matcher"] else {}),
-                "hooks": [{"type": "command", "command": f'bash "$CLAUDE_PROJECT_DIR/hooks/{h["script"]}"'}],
+                "hooks": [{"type": "command", "command": (
+                    f'{"python3" if h["script"].endswith(".py") else "bash"} "$CLAUDE_PROJECT_DIR/hooks/{h["script"]}"')}],
             } for h in lst]
         out[".claude/settings.json"] = json.dumps(cfg, indent=2, ensure_ascii=False) + "\n"
         out["CLAUDE.md"] = "Lee `AGENTS.md`: ahí están las reglas de este repositorio.\n"

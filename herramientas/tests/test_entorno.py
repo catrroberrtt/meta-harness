@@ -163,5 +163,121 @@ class EntornoGenerado(unittest.TestCase):
         self.assertNotIn(f"<!-- regla {n + 1} -->", (self.d / "AGENTS.md").read_text(encoding="utf8"))
 
 
+class PublicarSoloVerificado(unittest.TestCase):
+    """El motor comprueba contra fuentes declaradas; el hook impide publicar sin la marca del texto exacto."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.d = pathlib.Path(cls.tmp.name) / "e"
+        generar(cls.d, modulos="publicar-solo-verificado")
+        correr(["./instalar.sh", "--aplicar"], cls.d)
+        correr(["git", "config", "user.email", "prueba" + "@" + "ejemplo.invalid"], cls.d)
+        correr(["git", "config", "user.name", "prueba"], cls.d)
+        (cls.d / "docs").mkdir(exist_ok=True)
+        (cls.d / "docs" / "real.md").write_text("# real\n", encoding="utf8")
+        correr(["git", "add", "-A"], cls.d)
+        correr(["git", "commit", "-qm", "base"], cls.d)
+        cls.sha = correr(["git", "rev-parse", "--short", "HEAD"], cls.d).stdout.strip()
+        estado = cls.d / "scripts" / "estado.sh"
+        estado.write_text('#!/usr/bin/env bash\ncase "$1" in T-1) echo CERRADO;; T-2) echo ABIERTO;; *) exit 3;; esac\n', encoding="utf8")
+        estado.chmod(0o755)
+        toml = (cls.d / "entorno.toml").read_text(encoding="utf8")
+        ejemplo = ('# [[publicar.referencias]]\n# nombre = "ticket"\n# patron = "[A-Z]+-[0-9]+"\n'
+                   '# comprobar = ["./scripts/estado-ticket.sh", "{id}"]\n# estados_cerrados = ["DONE", "CERRADO"]')
+        real = ('[[publicar.referencias]]\nnombre = "ticket"\npatron = "T-[0-9]+"\n'
+                'comprobar = ["./scripts/estado.sh", "{id}"]\nestados_cerrados = ["CERRADO"]')
+        assert ejemplo in toml, "el ejemplo de referencias cambió: actualizar la prueba"
+        (cls.d / "entorno.toml").write_text(toml.replace(ejemplo, real), encoding="utf8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def motor(self, *a):
+        return correr([sys.executable, "scripts/verificar-publicacion.py", *a], self.d)
+
+    def texto(self, nombre, contenido):
+        (self.d / nombre).write_text(contenido, encoding="utf8")
+        return nombre
+
+    def hook(self, comando):
+        r = correr([sys.executable, "hooks/publicar-solo-verificado.py"], self.d,
+                   entrada=json.dumps({"tool_input": {"command": comando}}), env={"CLAUDE_PROJECT_DIR": str(self.d)})
+        return json.loads(r.stdout)["hookSpecificOutput"]["permissionDecision"] if r.stdout.strip() else "pasa"
+
+    def test_texto_correcto_pasa_y_deja_marca_atada_al_texto(self):
+        f = self.texto("ok.md", f"Cambia `docs/real.md` en el commit `{self.sha}`.\nEl ticket T-1 quedó resuelto.\n")
+        self.assertEqual(self.motor("revisar", f).returncode, 0)
+        self.assertEqual(self.motor("estado", f).returncode, 0)
+        (self.d / f).write_text((self.d / f).read_text(encoding="utf8") + "otra línea\n", encoding="utf8")
+        self.assertEqual(self.motor("estado", f).returncode, 1)  # editar invalida la marca
+
+    def test_detecta_ruta_commit_relleno_y_secreto(self):
+        clave = "AK" + "IA" + "ABCDEFGHIJKLMNOP"
+        f = self.texto("mal.md", f"Toca `src/no-existe.ts` y `deadbeefcafe`.\nTODO completar.\nk = \"{clave}\"\n")
+        r = self.motor("revisar", f)
+        self.assertEqual(r.returncode, 1)
+        for esperado in ("no existe en el repo", "el commit", "relleno", "secreto"):
+            self.assertIn(esperado, r.stdout)
+
+    def test_nuevo_y_externo_marcados_no_fallan(self):
+        f = self.texto("nuevo.md", "Agrega `src/futuro.ts` (nuevo) y usa `lib/ajena.js` (externo).\n")
+        self.assertEqual(self.motor("revisar", f).returncode, 0)
+
+    def test_referencia_inexistente_falla_y_estado_distinto_avisa(self):
+        f = self.texto("ref.md", "El ticket T-9 también aplica en este cambio.\n")
+        self.assertEqual(self.motor("revisar", f).returncode, 1)
+        f = self.texto("estado.md", "El ticket T-1 sigue pendiente de cerrar aquí.\nEl ticket T-2 está terminado y resuelto.\n")
+        r = self.motor("revisar", f)
+        self.assertEqual(r.returncode, 0)  # un aviso no bloquea el nivel 1: lo resuelve la revisión independiente
+        self.assertIn("su fuente dice «CERRADO»", r.stdout)
+        self.assertIn("su fuente dice «ABIERTO»", r.stdout)
+        self.assertIn("AVISOS DEL MOTOR", (self.d / (f + ".afirmaciones.md")).read_text(encoding="utf8"))
+
+    def test_nivel_2_valida_informe(self):
+        f = self.texto("n2.md", "Cambia `docs/real.md` y la compuerta siempre pasa en este repo.\n")
+        self.motor("revisar", f)
+        h = (self.d / (f + ".afirmaciones.md")).read_text(encoding="utf8").splitlines()[0].split()[1]
+        (self.d / "inf-mal.md").write_text(f"HASH: {h}\nREFUTADAS: 1\nNO_VERIFICABLES: 0\n| C01 | REFUTADA | x |\n", encoding="utf8")
+        self.assertEqual(self.motor("confirmar", f, "inf-mal.md").returncode, 1)
+        (self.d / "inf-corto.md").write_text(f"HASH: {h}\nREFUTADAS: 0\nNO_VERIFICABLES: 0\n", encoding="utf8")
+        self.assertEqual(self.motor("confirmar", f, "inf-corto.md").returncode, 1)  # no cubre las afirmaciones
+        (self.d / "inf-otro.md").write_text("HASH: 000000000000\nREFUTADAS: 0\nNO_VERIFICABLES: 0\n| C01 | CONFIRMADA | x |\n", encoding="utf8")
+        self.assertEqual(self.motor("confirmar", f, "inf-otro.md").returncode, 1)  # informe de otro texto
+        (self.d / "inf-ok.md").write_text(f"HASH: {h}\nREFUTADAS: 0\nNO_VERIFICABLES: 1\n| C01 | NO VERIFICABLE | x |\n", encoding="utf8")
+        self.assertEqual(self.motor("confirmar", f, "inf-ok.md").returncode, 0)
+
+    def test_hook_bloquea_sin_marca_y_deja_pasar_lo_demas(self):
+        ok = self.texto("h-ok.md", "Cambia `docs/real.md` hoy.\n")
+        self.motor("revisar", ok)
+        sin = self.texto("h-sin.md", "Texto sin verificar nunca.\n")
+        publicar = "gh pr " + "create --title t --body-file "
+        self.assertEqual(self.hook(publicar + ok), "pasa")
+        self.assertEqual(self.hook(publicar + sin), "deny")
+        self.assertEqual(self.hook("gh pr " + 'create --title t --body "inline"'), "deny")
+        self.assertEqual(self.hook("gh pr " + "create --body-file -"), "deny")
+        self.assertEqual(self.hook("gh issue " + "comment 4 --body-file no-existe.md"), "deny")
+        self.assertEqual(self.hook("echo hola && gh pr " + "comment 3 --body-file " + sin), "deny")
+        for lectura in ("gh pr view 12", "gh pr list", "ls -la", "gh pr " + "create --fill"):
+            self.assertEqual(self.hook(lectura), "pasa", lectura)
+
+    def test_hook_exige_nivel_2_si_se_configura(self):
+        toml = (self.d / "entorno.toml").read_text(encoding="utf8")
+        (self.d / "entorno.toml").write_text(toml.replace("exigir_nivel = 1", "exigir_nivel = 2"), encoding="utf8")
+        try:
+            f = self.texto("h-n1.md", "Cambia `docs/real.md` ahora.\n")
+            self.motor("revisar", f)
+            self.assertEqual(self.hook("gh pr " + "create --body-file " + f), "deny")
+        finally:
+            (self.d / "entorno.toml").write_text(toml, encoding="utf8")
+
+    def test_error_interno_del_hook_no_bloquea(self):
+        r = correr([sys.executable, "hooks/publicar-solo-verificado.py"], self.d, entrada="esto no es json",
+                   env={"CLAUDE_PROJECT_DIR": str(self.d)})
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), "")
+
+
 if __name__ == "__main__":
     unittest.main()

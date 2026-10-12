@@ -26,6 +26,7 @@ dentro del harness.
 | `conocimiento` | `knowledge/INDICE.md` y `scripts/frescura.py` (documentos vencidos) | A demanda |
 | `escaneo-secretos` | `scripts/escanear-secretos.py` (claves, tokens, credenciales en lo versionado) | A demanda y desde la compuerta |
 | `autoguardado` | Commit al cerrar la sesión; la **subida está apagada por defecto** | Hook `Stop` |
+| `publicar-solo-verificado` | Motor que comprueba un texto contra sus fuentes y deja una marca atada a su contenido; el hook impide publicarlo sin ella | Hook `PreToolUse` |
 | `aprendizaje` | `scripts/aprender.py`: lección con evidencia, promoción a regla y reversión | A demanda |
 
 Un módulo puede arrastrar a otro (autoguardado y compuerta traen el escaneo de secretos).
@@ -46,6 +47,29 @@ Un módulo puede arrastrar a otro (autoguardado y compuerta traen el escaneo de 
 2. `./instalar.sh` (muestra qué falta, no cambia nada) y `./instalar.sh --aplicar`.
 3. `./verificar.sh`.
 4. Abre la carpeta con su agente.
+
+## Publicar solo lo verificado
+
+El módulo `publicar-solo-verificado` separa el mecanismo de cualquier herramienta concreta: **de dónde sale la verdad de cada
+referencia se declara en `entorno.toml`**, no está escrito en el código.
+
+```toml
+[publicar]
+exigir_nivel = 1              # 2 = además, revisión independiente (docs/revisor-independiente.md)
+
+[[publicar.referencias]]
+nombre = "ticket"
+patron = "[A-Z]+-[0-9]+"
+comprobar = ["./scripts/estado-ticket.sh", "{id}"]   # termina en 0 si existe e imprime el estado
+estados_cerrados = ["DONE", "CERRADO"]
+```
+
+- **Nivel 1 (mecánico):** las rutas y los commits citados existen, cada referencia existe en su fuente y su estado coincide
+  con lo que el texto afirma (un aviso si dice «pendiente» y la fuente dice «cerrado»), sin secretos ni relleno sin completar.
+- **Nivel 2 (independiente):** otra persona o un agente de solo lectura comprueba las afirmaciones que ningún motor puede
+  (datos, estados, «ya existe en producción») y deja un informe que el motor valida.
+- **La marca está atada al contenido:** editar el texto la invalida. El hook rechaza además un cuerpo inline o por entrada
+  estándar, porque no se puede verificar; un error interno del hook **nunca** bloquea.
 
 ## Aprendizaje con evidencia
 

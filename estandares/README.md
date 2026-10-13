@@ -11,6 +11,7 @@ Lo aporta la instancia del proyecto; el mapa de migración vive en la instancia 
 
 <!-- open-design:inicio -->
 Estándar adicional: `diseno-web.md` (webs públicas: marca y tokens compartidos con el ERP, accesibilidad, privacidad, activos y licencias).
+Estándar adicional: `pautas-ux-pantallas-de-gestion.md` (listados, pestañas, detalles, monedas, adjuntos, documentos generados, cambio de función y tema oscuro medido): pautas de UX que evitan repetir las mismas correcciones en pantallas de gestión nuevas.
 <!-- open-design:fin -->
 
 <!-- seguridad-base:inicio -->

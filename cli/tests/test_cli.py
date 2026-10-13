@@ -367,7 +367,16 @@ class TestDoctor(FalsoHarness):
         c, out = self.doctor()
         self.assertEqual(c, 1)
         self.assertIn("viejo.md", out)
-        self.assertIn("Qué hacer", out)
+        self.assertIn("Siguiente:", out)
+
+    def test_todo_problema_trae_su_siguiente_paso(self):
+        class Salida:
+            def __init__(self): self.l = []
+            def p(self, x): self.l.append(x)
+            def e(self, x, c): return x
+        s = Salida()
+        hc.mostrar_doctor([("problema", "algo falló sin acción", "")], s)
+        self.assertTrue(any("Siguiente:" in x for x in s.l))
 
     def test_herramienta_requerida_ausente(self):
         real = shutil.which

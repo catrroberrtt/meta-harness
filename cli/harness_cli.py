@@ -720,8 +720,10 @@ def mostrar_doctor(filas, out):
     col = {"ok": "32", "info": "36", "problema": "31"}
     for nivel, texto, accion in filas:
         out.p(out.e(marca[nivel], col[nivel]) + texto)
+        if nivel == "problema" and not accion:
+            accion = "revisa el detalle de arriba y vuelve a correr `harness doctor`"   # ningún problema se muestra sin siguiente paso
         if accion:
-            out.p("          Qué hacer: " + accion)
+            out.p("          Siguiente: " + accion)
     n = sum(1 for f in filas if f[0] == "problema")
     out.p("\nRESULTADO: " + ("todo bien" if n == 0 else f"{n} problema(s)"))
     return 1 if n else 0
